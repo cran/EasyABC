@@ -13,8 +13,8 @@
   \tabular{ll}{
     Package: EasyABC
     Type: Package
-    Version: 1.0
-    Date: 2012-11-16
+    Version: 1.1
+    Date: 2013-01-21
     License: GPL-3
     LazyLoad: yes
   }

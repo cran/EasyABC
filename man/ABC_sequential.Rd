@@ -8,17 +8,19 @@
 	Sequential sampling schemes have been shown to be more efficient than standard rejection-based procedures.
 }
 \usage{
-	ABC_sequential(method, model, prior_matrix, nb_simul, summary_stat_target, n_cluster = 1,...)
+	ABC_sequential(method, model, prior, nb_simul, summary_stat_target, n_cluster = 1, use_seed = FALSE, verbose = FALSE, ...)
 }
 
 \arguments{
   \item{method}{
 	a character string indicating the sequential algorithm to be used. Possible values are \code{"Beaumont"}, \code{"Drovandi"}, \code{"Delmoral"} and \code{"Lenormand"}.}
   \item{model}{
-    	a \code{R} function implementing the model to be simulated. It must take as arguments an array containing a seed value (if \code{use_seed=TRUE}) and the model parameters and returning an array of summary statistics obtained at the end of the simulation.
-	A tutorial is provided in the package's vignette to dynamically link a binary code to a \code{R} function.  Users may alternatively wish to wrap their binary executables using the provided functions \code{\link{binary_model}} and \code{\link{binary_model_cluster}}. The use of these functions is associated with slightly different constraints on the design of the binary code (see \code{\link{binary_model}} and \code{\link{binary_model_cluster}}).}
-  \item{prior_matrix}{
-    	a matrix or data frame containing the ranges of the prior distribution for each of the \eqn{p} model parameters. It has \eqn{p} lines and 2 columns. The first (second) column contains the lower (upper) bound of the prior distribution of the \eqn{p} parameters.}
+    a \code{R} function implementing the model to be simulated. It must take as arguments a vector of model parameter values and it must return a vector of summary statistics. When using the option \code{use_seed=TRUE}, \code{model} must take as arguments a vector containing a seed value and the model parameter values.
+    A tutorial is provided in the package's vignette to dynamically link a binary code to a \code{R} function.  Users may alternatively wish to wrap their binary executables using the provided functions \code{\link{binary_model}} and \code{\link{binary_model_cluster}}. The use of these functions is associated with slightly different constraints on the design of the binary code (see \code{\link{binary_model}} and \code{\link{binary_model_cluster}}).}
+  \item{prior}{
+    a list of prior information. Each element of the list corresponds to a model parameter. The list element must be a vector whose first argument determines the type of prior distribution: possible values are \code{"unif"} for a uniform distribution on a segment, \code{"normal"} for a normal distribution, \code{"lognormal"} for a lognormal distribution or \code{"exponential"} for an exponential distribution.
+    The following arguments of the list elements contain the characteritiscs of the prior distribution chosen: for \code{"unif"}, two numbers must be given: the minimum and maximum values of the uniform distribution; for \code{"normal"}, two numbers must be given: the mean and standard deviation of the normal distribution; for \code{"lognormal"}, two numbers must be given: the mean and standard deviation on the log scale of the lognormal distribution; for \code{"exponential"}, one number must be given: the rate of the exponential distribution.
+    Note that when using the method "Lenormand", solely uniform prior distributions are supported.}
   \item{nb_simul}{
     	a positive integer equal to the desired number of simulations of the model below the tolerance threshold when \code{method} is \code{"Beaumont"}, \code{"Drovandi"} and \code{"Delmoral"}.
 	When \code{method} is \code{"Lenormand"}, the number of simulations below the tolerance threshold is equal to \code{nb_simul * alpha}. See the package's vignette and Lenormand et al. (2012) for details.}
@@ -26,6 +28,12 @@
 	a vector containing the targeted (observed) summary statistics.}
   \item{n_cluster}{
     a positive integer. If larger than 1 (the default value), \code{ABC_sequential} will launch \code{model} simulations in parallel on \code{n_cluster} cores of the computer.}
+  \item{use_seed}{
+    logical. If \code{FALSE} (default), \code{ABC_rejection} provides as input to the function \code{model} a vector containing the model parameters used for the simulation.
+    If \code{TRUE}, \code{ABC_rejection} provides as input to the function \code{model} a vector containing an integer seed value and the model parameters used for the simulation.
+    In this last case, the seed value should be used by \code{model} to initialize its pseudo-random number generators (if \code{model} is stochastic).}
+  \item{verbose}{
+    logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_rejection} writes in the current directory intermediary results at the end of each step of the algorithm.}
   \item{\dots}{Additional arguments can be passed depending on the choosen method (see below)}
 }
 
@@ -33,9 +41,9 @@
   Depending on the choosen method, you can specify the following arguments:
   \describe{
     \item{use_seed}{
-	  logical. If \code{TRUE} (default), \code{ABC_sequential} provides as input to the function \code{model} an array containing an integer seed value and the model parameters used for the simulation.
-	  The seed value should be used by \code{model} to initialize its pseudo-random number generators (if \code{model} is stochastic).
-	  If \code{FALSE} (default), \code{ABC_sequential} provides as input to the function \code{model} an array containing solely the model parameters used for the simulation.}
+        logical. If \code{FALSE} (default), \code{ABC_sequential} provides as input to the function \code{model} a vector containing the model parameters used for the simulation.
+        If \code{TRUE}, \code{ABC_sequential} provides as input to the function \code{model} a vector containing an integer seed value and the model parameters used for the simulation.
+        In this last case, the seed value should be used by \code{model} to initialize its pseudo-random number generators (if \code{model} is stochastic).}
     \item{seed_count}{
 	  a positive integer, the initial seed value provided to the function \code{model} (if \code{use_seed=TRUE}). This value is incremented by 1 at each call of the function \code{model}.}
     \item{inside_prior}{
@@ -114,33 +122,160 @@
 }
 \examples{
   \dontrun{
-    priormatrix=cbind(c(500,3,-2.3,1,-25,-0.7),c(500,5,1.6,1,125,3.2))
-    sum_stat_obs=c(100,2.5,20,30000)
+    ##### EXAMPLE 1 #####
+    #####################
+    set.seed(1)
 
-    ## artificial example to perform the Beaumont et al. (2009)'s method.
+    ## artificial example to show how to use the 'ABC_sequential' function.
+    ## defining a simple toy model:
+    toy_model<-function(x){ 2 * x + 5 + rnorm(1,0,0.1) }
+
+    ## define prior information
+    toy_prior=list(c("unif",0,1)) # a uniform prior distribution between 0 and 1
+
+    ## define the targeted summary statistics
+    sum_stat_obs=6.5
+
+    ## to perform the Beaumont et al. (2009)'s method:
     ##
-    ABC_Beaumont<-ABC_sequential(method="Beaumont", model=trait_model, prior_matrix=priormatrix,
-    nb_simul=10, summary_stat_target=sum_stat_obs, n_cluster=1, tolerance_tab=c(8,5))
+    tolerance=c(1.5,0.5)
+    ABC_Beaumont<-ABC_sequential(method="Beaumont", model=toy_model, prior=toy_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, tolerance_tab=tolerance)
     ABC_Beaumont
 
-    ## artificial example to perform the Drovandi and Pettitt (2011)'s method.
+    ## to perform the Drovandi and Pettitt (2011)'s method:
     ##
-    ABC_Drovandi<-ABC_sequential(method="Drovandi", model=trait_model, prior_matrix=priormatrix,
-    nb_simul=10, summary_stat_target=sum_stat_obs, n_cluster=1, tolerance_tab=3, c=0.7)
+    tolerance=0.5
+    c_drov=0.7
+    ABC_Drovandi<-ABC_sequential(method="Drovandi", model=toy_model, prior=toy_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, tolerance_tab=tolerance, c=c_drov)
     ABC_Drovandi
 
-    ## artificial example to perform the Del Moral et al. (2012)'s method.
+    ## to perform the Del Moral et al. (2012)'s method:
     ##
-    ABC_Delmoral<-ABC_sequential(method="Delmoral", model=trait_model, prior_matrix=priormatrix,
-    nb_simul=10, summary_stat_target=sum_stat_obs, n_cluster=1, alpha=0.5, tolerance_target=3)
+    alpha_delmo=0.5
+    tolerance=0.5
+    ABC_Delmoral<-ABC_sequential(method="Delmoral", model=toy_model, prior=toy_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, alpha=alpha_delmo, tolerance_target=tolerance)
     ABC_Delmoral
 
-    ## artificial example to perform the Lenormand et al. (2012)'s method.
+    ## to perform the Lenormand et al. (2012)'s method:
     ##
-    ABC_Lenormand<-ABC_sequential(method="Lenormand", model=trait_model, prior_matrix=priormatrix,
-    nb_simul=10, summary_stat_target=sum_stat_obs, n_cluster=1, p_acc_min=0.4)
+    pacc=0.4
+    ABC_Lenormand<-ABC_sequential(method="Lenormand", model=toy_model, prior=toy_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, p_acc_min=pacc)
     ABC_Lenormand
-  }
+
+
+    ##### EXAMPLE 2 #####
+    #####################
+
+    ## this time, the model has two parameters and outputs two summary statistics.
+    ## defining a simple toy model:
+    toy_model2<-function(x){ c( x[1] + x[2] + rnorm(1,0,0.1) , x[1] * x[2] + rnorm(1,0,0.1) ) }
+
+    ## define prior information
+    toy_prior2=list(c("unif",0,1),c("normal",1,2)) # a uniform prior distribution between 0 and 1 for parameter 1, and a normal distribution of mean 1 and standard deviation of 2 for parameter 2.
+
+    ## define the targeted summary statistics
+    sum_stat_obs2=c(1.5,0.5)
+
+    ## to perform the Beaumont et al. (2009)'s method:
+    ##
+    tolerance=c(1.5,0.5)
+    ABC_Beaumont<-ABC_sequential(method="Beaumont", model=toy_model2, prior=toy_prior2,
+    nb_simul=20, summary_stat_target=sum_stat_obs2, tolerance_tab=tolerance)
+    ABC_Beaumont
+
+    ## to perform the Drovandi and Pettitt (2011)'s method:
+    ##
+    tolerance=0.5
+    c_drov=0.7
+    ABC_Drovandi<-ABC_sequential(method="Drovandi", model=toy_model2, prior=toy_prior2,
+    nb_simul=20, summary_stat_target=sum_stat_obs2, tolerance_tab=tolerance, c=c_drov)
+    ABC_Drovandi
+
+    ## to perform the Del Moral et al. (2012)'s method:
+    ##
+    alpha_delmo=0.5
+    tolerance=0.5
+    ABC_Delmoral<-ABC_sequential(method="Delmoral", model=toy_model2, prior=toy_prior2,
+    nb_simul=20, summary_stat_target=sum_stat_obs2, alpha=alpha_delmo, tolerance_target=tolerance)
+    ABC_Delmoral
+
+    ## to perform the Lenormand et al. (2012)'s method:
+    ##
+    pacc=0.4
+    # Only uniform priors are supported for the method "Lenormand" (since it performs a Latin Hypercube sampling at the beginning):
+    toy_prior2=list(c("unif",0,1),c("unif",0.5,1.5)) # a uniform prior distribution between 0 and 1 for parameter 1, and a normal distribution of mean 1 and standard deviation of 1 for parameter 2.
+    ABC_Lenormand<-ABC_sequential(method="Lenormand", model=toy_model2, prior=toy_prior2,
+    nb_simul=20, summary_stat_target=sum_stat_obs2, p_acc_min=pacc)
+    ABC_Lenormand
+
+    ##### EXAMPLE 3 #####
+    #####################
+
+    ## this time, the model is a C++ function packed into a R function -- this time, the option 'use_seed' must be turned to TRUE.
+    n=10
+    ## define prior information
+    trait_prior=list(c("unif",500,500),c("unif",3,5),c("unif",-2.3,1.6),c("unif",1,1),c("unif",-25,125),c("unif",-0.7,3.2))
+    trait_prior
+
+    ## define the targeted summary statistics
+    sum_stat_obs=c(100,2.5,20,30000)
+
+    ## to perform the Beaumont et al. (2009)'s method:
+    ##
+    tolerance=c(8,5)
+    ABC_Beaumont<-ABC_sequential(method="Beaumont", model=trait_model, prior=trait_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, tolerance_tab=tolerance, use_seed=TRUE)
+    ABC_Beaumont
+
+    ## to perform the Drovandi and Pettitt (2011)'s method:
+    ##
+    tolerance=3
+    c_drov=0.7
+    ABC_Drovandi<-ABC_sequential(method="Drovandi", model=trait_model, prior=trait_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, tolerance_tab=tolerance, c=c_drov, use_seed=TRUE)
+    ABC_Drovandi
+
+    ## to perform the Del Moral et al. (2012)'s method:
+    ##
+    alpha_delmo=0.5
+    tolerance=3
+    ABC_Delmoral<-ABC_sequential(method="Delmoral", model=trait_model, prior=trait_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, alpha=alpha_delmo, tolerance_target=tolerance, use_seed=TRUE)
+    ABC_Delmoral
+
+    ## to perform the Lenormand et al. (2012)'s method:
+    ##
+    pacc=0.4
+    ABC_Lenormand<-ABC_sequential(method="Lenormand", model=trait_model, prior=trait_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, p_acc_min=pacc, use_seed=TRUE)
+    ABC_Lenormand
+
+
+    ##### EXAMPLE 4 - Parallel implementations #####
+    ################################################
+
+    ## NB: the option use_seed must be turned to TRUE.
+
+    ## For models already running with the option use_seed=TRUE, simply change the value of n_cluster:
+    sum_stat_obs=c(100,2.5,20,30000)
+    ABC_Lenormand<-ABC_sequential(method="Lenormand", model=trait_model, prior=trait_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, p_acc_min=pacc, use_seed=TRUE, n_cluster=2)
+    ABC_Lenormand
+
+    ## For other models, change the value of n_cluster and modify the model so that the first parameter becomes a seed information value:
+    toy_model_parallel<-function(x){ 
+	set.seed(x[1])
+	2 * x[2] + 5 + rnorm(1,0,0.1) }
+    sum_stat_obs=6.5
+
+    ABC_Lenormand<-ABC_sequential(method="Lenormand", model=toy_model_parallel, prior=toy_prior,
+    nb_simul=20, summary_stat_target=sum_stat_obs, p_acc_min=pacc, use_seed=TRUE, n_cluster=2)
+    ABC_Lenormand
+  }%dontrun
 }
 \keyword{abc}
 \keyword{model}
