@@ -29,21 +29,23 @@
   \item{n_cluster}{
     a positive integer. If larger than 1 (the default value), \code{ABC_sequential} will launch \code{model} simulations in parallel on \code{n_cluster} cores of the computer.}
   \item{use_seed}{
-    logical. If \code{FALSE} (default), \code{ABC_rejection} provides as input to the function \code{model} a vector containing the model parameters used for the simulation.
-    If \code{TRUE}, \code{ABC_rejection} provides as input to the function \code{model} a vector containing an integer seed value and the model parameters used for the simulation.
+    logical. If \code{FALSE} (default), \code{ABC_sequential} provides as input to the function \code{model} a vector containing the model parameters used for the simulation.
+    If \code{TRUE}, \code{ABC_sequential} provides as input to the function \code{model} a vector containing an integer seed value and the model parameters used for the simulation.
     In this last case, the seed value should be used by \code{model} to initialize its pseudo-random number generators (if \code{model} is stochastic).}
   \item{verbose}{
-    logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_rejection} writes in the current directory intermediary results at the end of each step of the algorithm.}
+    logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_sequential} writes in the current directory intermediary results at the end of each step of the algorithm various files.
+    The file "n_simul_tot_step_iteration" (where iteration is the step number) contains the total number of simulations performed since the beginning of the algorithm at the end of the step "iteration".
+    The file "R_step_iteration" (when using the method "Drovandi") is the parameter R used during the step "iteration" (see Drovandi and Pettitt 2011 for details).
+    The file "p_acc_iteration" (when using the method "Lenormand") is the parameter p_acc computed at the end of the step "iteration" (see Lenormand et al. 2012 for details).
+    The file "tolerance_step_iteration" (when using the method "Drovandi", "Delmoral" or "Lenormand") is the tolerance computed at the end of the step "iteration".
+    The file "output_step_iteration"  has a matrix format, in wich each raw is a different simulation, the first column is the weight of the simulation, the following columns are the parameters used for this simulation, and the last columns are the summary statistics of this simulation.
+    All these informations are further stored in a list (with the same formats) and are accessible from R - see \code{intermediary} in the value section below.}
   \item{\dots}{Additional arguments can be passed depending on the choosen method (see below)}
 }
 
 \section{Additional paramaters}{
   Depending on the choosen method, you can specify the following arguments:
   \describe{
-    \item{use_seed}{
-        logical. If \code{FALSE} (default), \code{ABC_sequential} provides as input to the function \code{model} a vector containing the model parameters used for the simulation.
-        If \code{TRUE}, \code{ABC_sequential} provides as input to the function \code{model} a vector containing an integer seed value and the model parameters used for the simulation.
-        In this last case, the seed value should be used by \code{model} to initialize its pseudo-random number generators (if \code{model} is stochastic).}
     \item{seed_count}{
 	  a positive integer, the initial seed value provided to the function \code{model} (if \code{use_seed=TRUE}). This value is incremented by 1 at each call of the function \code{model}.}
     \item{inside_prior}{
@@ -71,7 +73,7 @@
 	  This is the number of \code{model} simulations performed for each parameter set.
 	  Default value is 1. See the package's vignette and Del Moral et al. (2012) for details.}
     \item{nb_threshold}{
-	  a positive integer used when \code{method} is \code{"Delmoral"}.
+	  a positive integer used when \code{method} is \code{"Delmoral"}. Default value is 0.5*\code{nb_simul}.
 	  This is the minimal effective sample size below which a resampling step is launched. See the package's vignette and Del Moral et al. (2012) for details.}
     \item{tolerance_target}{
 	  a positive number used when \code{method} is \code{"Delmoral"}.
@@ -80,8 +82,6 @@
 	  a positive number between 0 and 1 (strictly) used when \code{method} is \code{"Lenormand"}.
 	  This is the stopping criterion of the algorithm: a small number ensures a better convergence of the algorithm, but at a cost in computing time.
 	  Default value is 0.05. See the package's vignette and Lenormand et al. (2012) for details.}
-    \item{verbose}{
-	  logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_sequential} writes in the current directory intermediary results at the end of each step of the algorithm.}
     \item{progress_bar}{
       logical, \code{FALSE} by default. If \code{TRUE}, \code{ABC_sequential} will output a bar of progression with the estimated remaining computing time. Option not available with multiple cores.}
   }
@@ -106,6 +106,8 @@
   	The number of \code{model} simulations performed.}
   \item{computime}{
   	The computing time to perform the simulations.}
+  \item{intermediary}{
+  	Intermediary results stored when the option \code{"verbose=TRUE"} is chosen. Each element of this list corresponds to a different step. See the argument \code{verbose} above for more details on the information stored.}
 }
 \references{
 	Beaumont, M. A., Cornuet, J., Marin, J., and Robert, C. P. (2009) Adaptive approximate Bayesian computation. \emph{Biometrika},\bold{96}, 983--990.
@@ -121,7 +123,7 @@
   \code{\link{binary_model}}, \code{\link{binary_model_cluster}}, \code{\link{ABC_rejection}}, \code{\link{ABC_mcmc}}
 }
 \examples{
-  \dontrun{
+ \dontrun{
     ##### EXAMPLE 1 #####
     #####################
     set.seed(1)
@@ -275,7 +277,7 @@
     ABC_Lenormand<-ABC_sequential(method="Lenormand", model=toy_model_parallel, prior=toy_prior,
     nb_simul=20, summary_stat_target=sum_stat_obs, p_acc_min=pacc, use_seed=TRUE, n_cluster=2)
     ABC_Lenormand
-  }%dontrun
+ }%dontrun
 }
 \keyword{abc}
 \keyword{model}

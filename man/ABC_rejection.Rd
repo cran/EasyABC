@@ -31,7 +31,8 @@
   \item{n_cluster}{
     a positive integer. If larger than 1 (the default value), \code{ABC_rejection} will launch \code{model} simulations in parallel on \code{n_cluster} cores of the computer.}
   \item{verbose}{
-    logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_rejection} writes in the current directory intermediary results at the end of each step of the algorithm.}
+    logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_rejection} writes in the current directory intermediary results at the end of each step of the algorithm in the file "output".
+    These outputs have a matrix format, in wich each raw is a different simulation, the first columns are the parameters used for this simulation, and the last columns are the summary statistics of this simulation.}
   \item{progress_bar}{
     logical, \code{FALSE} by default. If \code{TRUE}, \code{ABC_rejection} will output a bar of progression with the estimated remaining computing time. Option not available with multiple cores.}
 }
@@ -64,7 +65,7 @@
   \code{\link{binary_model}}, \code{\link{binary_model_cluster}}, \code{\link{ABC_sequential}}, \code{\link{ABC_mcmc}}
 }
 \examples{
-  \dontrun{
+ \dontrun{
     ##### EXAMPLE 1 #####
     #####################
     set.seed(1)
@@ -149,7 +150,7 @@
     sum_stat_obs=6.5
 
     ABC_simb<-ABC_rejection(model=toy_model_parallel, prior=toy_prior, nb_simul=n, use_seed=TRUE, n_cluster=2)
-  }%dontrun
+ }%dontrun
 }
 \keyword{abc}
 \keyword{model}

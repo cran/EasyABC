@@ -28,11 +28,12 @@
   \item{n_cluster}{
     a positive integer. If larger than 1 (the default value), \code{ABC_mcmc} will launch \code{model} simulations in parallel on \code{n_cluster} cores of the computer.}
   \item{use_seed}{
-    logical. If \code{FALSE} (default), \code{ABC_rejection} provides as input to the function \code{model} a vector containing the model parameters used for the simulation.
-    If \code{TRUE}, \code{ABC_rejection} provides as input to the function \code{model} a vector containing an integer seed value and the model parameters used for the simulation.
+    logical. If \code{FALSE} (default), \code{ABC_mcmc} provides as input to the function \code{model} a vector containing the model parameters used for the simulation.
+    If \code{TRUE}, \code{ABC_mcmc} provides as input to the function \code{model} a vector containing an integer seed value and the model parameters used for the simulation.
     In this last case, the seed value should be used by \code{model} to initialize its pseudo-random number generators (if \code{model} is stochastic).}
   \item{verbose}{
-    logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_rejection} writes in the current directory intermediary results at the end of each step of the algorithm.}
+    logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_mcmc} writes in the current directory intermediary results at the end of each step of the algorithm in the file "output_mcmc".
+    These outputs have a matrix format, in wich each raw is a different simulation, the first columns are the parameters used for this simulation, the following columns are the summary statistics of this simulation, and the last column is the distance between the simulation and the data.}
   \item{\dots}{Additional arguments can be passed depending on the choosen method (see below)}
 }
 
@@ -50,7 +51,7 @@
     \item{proposal_range}{
 	  a vector of the same length as the number of model parameters, used when \code{method} is \code{"Marjoram_original"}.
 	  Each element contains a positive number defining the range of MCMC jumps for each model parameter.
-	  If not provided by the user, a default value is used for each parameter is used and a warning is printed. The default value is 1/50 of the prior range for uniform distributions, 1/20 of the standard deviation of the prior distribution for normal distributions, 1/20 * exp ( sigma * sigma } for lognormal distributions where sigma is the standard deviation of the prior distribution in the log scale, and 1/20 of the inverse of the rate for exponential distributions.
+	  If not provided by the user, a default value is used for each parameter and a warning is printed. The default value is 1/50 of the prior range for uniform distributions, 1/20 of the standard deviation of the prior distribution for normal distributions, 1/20 * exp ( sigma * sigma } for lognormal distributions where sigma is the standard deviation of the prior distribution in the log scale, and 1/20 of the inverse of the rate for exponential distributions.
     \item{n_calibration}{
 	  a positive integer, used when \code{method} is \code{"Marjoram"} or \code{"Wegmann"}.
 	  This is the number of simulations performed during the calibration step.
@@ -67,14 +68,8 @@
 	  a positive integer, used when \code{method} is \code{"Wegmann"}.
 	  This is the number of components to be used for PLS transformations.
 	  Default value is 0 which encodes that this number is equal to the number of summary statistics.}
-    \item{use_seed}{
-        logical. If \code{FALSE} (default), \code{ABC_mcmc} provides as input to the function \code{model} a vector containing the model parameters used for the simulation.
-        If \code{TRUE}, \code{ABC_mcmc} provides as input to the function \code{model} a vector containing an integer seed value and the model parameters used for the simulation.
-        In this last case, the seed value should be used by \code{model} to initialize its pseudo-random number generators (if \code{model} is stochastic).}
     \item{seed_count}{
 	  a positive integer, the initial seed value provided to the function \code{model} (if \code{use_seed=TRUE}). This value is incremented by 1 at each call of the function \code{model}.}
-    \item{verbose}{
-	  logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_mcmc} writes in the current directory intermediary results at the end of the calibration step of the algorithm.}
     \item{progress_bar}{
       logical, \code{FALSE} by default. If \code{TRUE}, \code{ABC_mcmc} will output a bar of progression with the estimated remaining computing time. Option not available with multiple cores.}
   }
@@ -130,7 +125,7 @@
   \code{\link{binary_model}}, \code{\link{binary_model_cluster}}, \code{\link{ABC_rejection}}, \code{\link{ABC_sequential}}
 }
 \examples{
-  \dontrun{
+ \dontrun{
     ##### EXAMPLE 1 #####
     #####################
 
@@ -196,7 +191,7 @@
     tol_quant=0.2 
     ABC_Wegmann<-ABC_mcmc(method="Wegmann", model=trait_model, prior=trait_prior,  summary_stat_target=sum_stat_obs, n_rec=n, n_calibration=n_calib, tolerance_quantile=tol_quant, use_seed=TRUE)
     ABC_Wegmann
-  }%dontrun
+ }%dontrun
 }
 \keyword{abc}
 \keyword{model}

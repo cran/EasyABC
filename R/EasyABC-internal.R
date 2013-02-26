@@ -253,12 +253,14 @@ param
     if (use_seed) {
       tab_param=rbind(tab_param,param[2:(l+1)])
       if (verbose){
-	write.table(c(param[2:(l+1)],simul_summarystat),file="output",row.names=F,col.names=F,quote=F,append=T)
+	intermed=c(param[2:(l+1)],simul_summarystat)
+	write(intermed,file="output",ncolumns=length(intermed),append=T)
       }
     } else {
       tab_param=rbind(tab_param,param)
       if (verbose){
-	write.table(c(param,simul_summarystat),file="output",row.names=F,col.names=F,quote=F,append=T)
+	intermed=c(param,simul_summarystat)
+	write(intermed,file="output",ncolumns=length(intermed),append=T)
       }
     }
     if (!is.null(pb)) {
@@ -599,9 +601,11 @@ list(param=rejection$param, stats=as.matrix(rejection$summarystat), weights=arra
   } # until we get nb_simul simulations below the first tolerance threshold
   # initially, weights are equal
   tab_weight=array(1/nb_simul,nb_simul)
+  intermediary_steps=list(NULL)
   if (verbose==TRUE){
     write.table(as.matrix(cbind(tab_weight,simul_below_tol)),file="output_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
+    intermediary_steps[[1]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
   }
   if (progress_bar){
 	  print("step 1 completed")
@@ -642,12 +646,20 @@ list(param=rejection$param, stats=as.matrix(rejection$summarystat), weights=arra
     if (verbose==TRUE){
       write.table(as.matrix(cbind(tab_weight,simul_below_tol)),file=paste("output_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.numeric(seed_count-seed_count_ini),file=paste("n_simul_tot_step",it,sep=""),row.names=F,col.names=F,quote=F)
+      intermediary_steps[[it]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
     }
     if (progress_bar){
 	    print(paste("step ",it," completed",sep=""))
     }
   }
-  list(param=as.matrix(simul_below_tol[,1:nparam]),stats=as.matrix(simul_below_tol[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(simul_below_tol[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  final_res=NULL
+  if (verbose==TRUE){
+  	final_res=list(param=as.matrix(simul_below_tol[,1:nparam]),stats=as.matrix(simul_below_tol[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(simul_below_tol[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")),intermediary=intermediary_steps)
+  }
+  else{
+  	final_res=list(param=as.matrix(simul_below_tol[,1:nparam]),stats=as.matrix(simul_below_tol[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(simul_below_tol[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  }
+  final_res
 }
 
 ## function to select the alpha quantile closest simulations
@@ -824,9 +836,11 @@ list(param=rejection$param, stats=as.matrix(rejection$summarystat), weights=arra
   }
   # initially, weights are equal
   tab_weight=array(1/nb_simul,nb_simul)
+  intermediary_steps=list(NULL)
   if (verbose==TRUE){
     write.table(as.matrix(cbind(tab_weight,simul_below_tol)),file="output_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
+    intermediary_steps[[1]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
   }
   if (progress_bar){
 	  print("step 1 completed")
@@ -917,12 +931,18 @@ list(param=rejection$param, stats=as.matrix(rejection$summarystat), weights=arra
     simul_below_tol=simul_below_tol3
     p_acc=max(1,i_acc)/(nb_simul_step*R) # to have a strictly positive p_acc
     Rp=R
-    R=ceiling(log(c)/log(1-p_acc))
+    if (p_acc<1){
+       R=ceiling(log(c)/log(1-p_acc))
+    }
+    else{
+       R=1
+    }
     if (verbose==TRUE){
       write.table(as.numeric(Rp),file=paste("R_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.numeric(tol_next),file=paste("tolerance_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.numeric(seed_count-seed_count_ini),file=paste("n_simul_tot_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.matrix(cbind(tab_weight,simul_below_tol)),file=paste("output_step",it,sep=""),row.names=F,col.names=F,quote=F)
+      intermediary_steps[[it]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),R_step=as.numeric(Rp),tol_step=as.numeric(tol_next),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
     }
     tol_next=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul))
     if (progress_bar){
@@ -955,7 +975,15 @@ list(param=rejection$param, stats=as.matrix(rejection$summarystat), weights=arra
     seed_count=seed_count+R
     simul_below_tol2=rbind(simul_below_tol2,as.numeric(simul_picked))
   }
-  list(param=as.matrix(simul_below_tol2[,1:nparam]),stats=as.matrix(simul_below_tol2[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol2)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+
+  final_res=NULL
+  if (verbose==TRUE){
+  	final_res=list(param=as.matrix(simul_below_tol2[,1:nparam]),stats=as.matrix(simul_below_tol2[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol2)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")),intermediary=intermediary_steps)
+  }
+  else{
+  	final_res=list(param=as.matrix(simul_below_tol2[,1:nparam]),stats=as.matrix(simul_below_tol2[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol2)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  }
+  final_res
 }
 
 
@@ -1133,9 +1161,11 @@ list(param=rejection$param, stats=as.matrix(rejection$summarystat), weights=arra
   new_tolerance=max(particle_dist_mat)
   
   tab_weight2=.replicate_tab(tab_weight,M)
+  intermediary_steps=list(NULL)
   if (verbose==TRUE){
     write.table(as.matrix(cbind(tab_weight2,simul_below_tol)),file="output_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
+    intermediary_steps[[1]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),posterior=as.matrix(cbind(tab_weight2,simul_below_tol)))
   }
   if (progress_bar){
 	  print("step 1 completed")
@@ -1314,12 +1344,20 @@ list(param=rejection$param, stats=as.matrix(rejection$summarystat), weights=arra
       write.table(as.numeric(new_tolerance),file=paste("tolerance_step",kstep,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.matrix(cbind(tab_weight2,simul_below_tol)),file=paste("output_step",kstep,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.numeric(seed_count-seed_count_ini),file=paste("n_simul_tot_step",kstep,sep=""),row.names=F,col.names=F,quote=F)
+      intermediary_steps[[kstep]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),tol_step=as.numeric(new_tolerance),posterior=as.matrix(cbind(tab_weight2,simul_below_tol)))
     }
     if (progress_bar){
 	    print(paste("step ",kstep," completed - tol =",new_tolerance,sep=""))
     }
   }
-  list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight2/sum(tab_weight2),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  final_res=NULL
+  if (verbose==TRUE){
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight2/sum(tab_weight2),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")),intermediary=intermediary_steps)
+  }
+  else{
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight2/sum(tab_weight2),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  }
+  final_res
 }
 
 .all_unif<-function(prior){
@@ -1554,10 +1592,12 @@ res
   
   tab_dist=.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)
   tol_next=max(tab_dist)
+  intermediary_steps=list(NULL)
   if (verbose==TRUE){
     write.table(as.matrix(cbind(tab_weight,simul_below_tol)),file="output_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(tol_next),file="tolerance_step1",row.names=F,col.names=F,quote=F)
+    intermediary_steps[[1]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),tol_step=as.numeric(tol_next),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
   }
   if (progress_bar){
 	print("step 1 completed")
@@ -1603,12 +1643,20 @@ res
       write.table(as.numeric(seed_count-seed_count_ini),file=paste("n_simul_tot_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.numeric(p_acc),file=paste("p_acc_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.numeric(tol_next),file=paste("tolerance_step",it,sep=""),row.names=F,col.names=F,quote=F)
+      intermediary_steps[[it]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),tol_step=as.numeric(tol_next),p_acc=as.numeric(p_acc),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
     }
     if (progress_bar){
     	print(paste("step ",it," completed - p_acc = ",p_acc,sep=""))
     }
   }
-  list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  final_res=NULL
+  if (verbose==TRUE){
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")),intermediary=intermediary_steps)
+  }
+  else{
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  }
+  final_res
 }
 
 
@@ -1781,6 +1829,10 @@ res
   tab_param=param_ini
   tab_simul_summary_stat=tab_simul_ini
   tab_dist=as.numeric(dist_ini)
+  if (verbose==TRUE){
+   	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
+  }
   for (is in 2:n_obs){
     for (i in 1:n_between_sampling){
       param=.move_particle_uni_uniform(as.numeric(param_ini),proposal_range,prior)
@@ -1803,7 +1855,8 @@ res
     tab_param=rbind(tab_param,as.numeric(param_ini))
     tab_dist=rbind(tab_dist,as.numeric(dist_ini))
     if (verbose==TRUE){
-    	write.table(c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini)),file="output_mcmc",row.names=F,col.names=F,quote=F,append=T)
+	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
     }
     if (progress_bar){
 	    # for progressbar message and time evaluation
@@ -1914,6 +1967,7 @@ res
     write.table((seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
     write.table(NULL,file="output_mcmc",row.names=F,col.names=F,quote=F)
   }
+
   if (progress_bar){
 	  print("initial calibration performed ")
   }
@@ -1930,6 +1984,10 @@ res
   tab_simul_summary_stat=tab_simul_ini
   tab_dist=as.numeric(dist_ini)
   seed_count=seed_count+1
+  if (verbose==TRUE){
+   	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
+  }
   for (is in 2:n_obs){
     for (i in 1:n_between_sampling){
       param=.move_particle_uni_uniform(as.numeric(param_ini),proposal_range,prior)
@@ -1952,8 +2010,9 @@ res
     tab_param=rbind(tab_param,as.numeric(param_ini))
     tab_dist=rbind(tab_dist,as.numeric(dist_ini))
     if (verbose==TRUE){
-    	write.table(c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini)),file="output_mcmc",row.names=F,col.names=F,quote=F,append=T)
-    }
+    	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
+   }
     if (progress_bar){
 	    # for progressbar message and time evaluation
 		    duration = difftime(Sys.time(), startb, units="secs")
@@ -2171,6 +2230,10 @@ res
   dist_ini=simuldist[(ord_sim[n_ini])]
   tab_dist=as.numeric(dist_ini)
   seed_count=seed_count+1
+  if (verbose==TRUE){
+   	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
+  }
   for (is in 2:n_obs){
     for (i in 1:n_between_sampling){
       ## AM6
@@ -2210,7 +2273,8 @@ res
     tab_param=rbind(tab_param,as.numeric(param_ini))
     tab_dist=rbind(tab_dist,as.numeric(dist_ini))
     if (verbose==TRUE){
-    	write.table(c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini)),file="output_mcmc",row.names=F,col.names=F,quote=F,append=T)
+    	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
     }
     if (progress_bar){
 	    # for progressbar message and time evaluation
@@ -2360,7 +2424,8 @@ res
 		simultemp=rbind(simultemp,as.numeric(list_simul_summarystat[[i]]))
 	  }
 	  if (verbose){
-		write.table(cbind(as.matrix(paramtemp),as.matrix(simultemp)),file="output",row.names=F,col.names=F,quote=F,append=T)
+		intermed=cbind(as.matrix(paramtemp),as.matrix(simultemp))
+		write.table(intermed,file="output",row.names=F,col.names=F,quote=F,append=T)
 	  }
          }
 	}
@@ -2386,7 +2451,8 @@ res
 		simultemp=rbind(simultemp,as.numeric(list_simul_summarystat[[i]]))
 	  }
  	  if (verbose){
-		write.table(cbind(as.matrix(paramtemp),as.matrix(simultemp)),file="output",row.names=F,col.names=F,quote=F,append=T)
+		intermed=cbind(as.matrix(paramtemp),as.matrix(simultemp))
+		write.table(intermed,file="output",row.names=F,col.names=F,quote=F,append=T)
 	  }
     	  stopCluster(cl)
 	}
@@ -2656,9 +2722,11 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
   } # until we get nb_simul simulations below the first tolerance threshold
   # initially, weights are equal
   tab_weight=array(1/nb_simul,nb_simul)
+  intermediary_steps=list(NULL)
   if (verbose==TRUE){
     write.table(cbind(tab_weight,simul_below_tol),file="output_step1",row.names=F,col.names=F,quote=F)
     write.table((seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
+    intermediary_steps[[1]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
   }
   if (progress_bar){
 	  print("step 1 completed")
@@ -2699,12 +2767,21 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
     if (verbose==TRUE){
       write.table(as.matrix(cbind(tab_weight,simul_below_tol)),file=paste("output_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table((seed_count-seed_count_ini),file=paste("n_simul_tot_step",it,sep=""),row.names=F,col.names=F,quote=F)
+      intermediary_steps[[it]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
     }
     if (progress_bar){
    	 print(paste("step ",it," completed",sep=""))
     }
   }
-  list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(as.matrix(simul_below_tol))[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  
+  final_res=NULL
+  if (verbose==TRUE){
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(as.matrix(simul_below_tol))[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")),intermediary=intermediary_steps)
+  }
+  else{
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(as.matrix(simul_below_tol))[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")))
+  }
+  final_res
 }
 
 
@@ -3018,9 +3095,11 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
   }
   # initially, weights are equal
   tab_weight=array(1/nb_simul,nb_simul)
+  intermediary_steps=list(NULL)
   if (verbose==TRUE){
     write.table(cbind(tab_weight,simul_below_tol),file="output_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
+    intermediary_steps[[1]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
   }
   if (progress_bar){
 	  print("step 1 completed")
@@ -3075,12 +3154,18 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
     simul_below_tol=simul_below_tol3
     p_acc=max(1,i_acc)/(nb_simul_step*R) # to have a strictly positive p_acc
     Rp=R
-    R=ceiling(log(c)/log(1-p_acc))
+    if (p_acc<1){
+        R=ceiling(log(c)/log(1-p_acc))
+    }
+    else{
+	R=1
+    }
     if (verbose==TRUE){
       write.table(as.numeric(tol_next),file=paste("tolerance_step",it,sep=""),row.names=F,col.names=F,quote=F) 
       write.table(as.numeric(Rp),file=paste("R_step",it,sep=""),row.names=F,col.names=F,quote=F) 
       write.table(as.numeric(seed_count-seed_count_ini),file=paste("n_simul_tot_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table(cbind(tab_weight,simul_below_tol),file=paste("output_step",it,sep=""),row.names=F,col.names=F,quote=F)
+      intermediary_steps[[it]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),R_step=as.numeric(Rp),tol_step=as.numeric(tol_next),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
     }
     tol_next=max(.compute_dist(summary_stat_target,simul_below_tol[,(nparam+1):(nparam+nstat)],sd_simul))
     if (progress_bar){
@@ -3095,7 +3180,14 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
     seed_count=seed_count+nb_simul
   }
   
-  list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs"))) 
+  final_res=NULL
+  if (verbose==TRUE){
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")),intermediary=intermediary_steps) 
+  }
+  else{
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs"))) 
+  }
+  final_res
 }
 
 
@@ -3214,9 +3306,11 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
   new_tolerance=max(particle_dist_mat)
   
   tab_weight2=.replicate_tab(tab_weight,M)
+  intermediary_steps=list(NULL)
   if (verbose==TRUE){ 
     write.table(cbind(tab_weight2,simul_below_tol),file="output_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
+    intermediary_steps[[1]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),posterior=as.matrix(cbind(tab_weight2,simul_below_tol)))
   }
   if (progress_bar){
 	  print("step 1 completed")
@@ -3417,6 +3511,7 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
       write.table(as.numeric(new_tolerance),file=paste("tolerance_step",kstep,sep=""),row.names=F,col.names=F,quote=F)
       write.table(cbind(tab_weight2,simul_below_tol),file=paste("output_step",kstep,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.numeric(seed_count-seed_count_ini),file=paste("n_simul_tot_step",kstep,sep=""),row.names=F,col.names=F,quote=F)
+      intermediary_steps[[kstep]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),tol_step=as.numeric(new_tolerance),posterior=as.matrix(cbind(tab_weight2,simul_below_tol)))
     }
     if (progress_bar){
       print(paste("step ",kstep," completed - tol =",new_tolerance,sep=""))
@@ -3424,6 +3519,14 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
   }
   stopCluster(cl)	
   list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight2/sum(tab_weight2),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs"))) 
+  final_res=NULL
+  if (verbose==TRUE){
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight2/sum(tab_weight2),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")),intermediary=intermediary_steps)
+  }
+  else{
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight2/sum(tab_weight2),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs"))) 
+  }
+  final_res
 }
 
 ## function to sample in the prior distributions using a Latin Hypercube sample
@@ -3775,10 +3878,12 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
   
   tab_dist=.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)
   tol_next=max(tab_dist)
+  intermediary_steps=list(NULL)
   if (verbose==TRUE){ 
     write.table(cbind(tab_weight,simul_below_tol),file="output_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(seed_count-seed_count_ini),file="n_simul_tot_step1",row.names=F,col.names=F,quote=F)
     write.table(as.numeric(tol_next),file="tolerance_step1",row.names=F,col.names=F,quote=F) 
+    intermediary_steps[[1]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),tol_step=as.numeric(tol_next),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
   }
   if (progress_bar){
 	  print("step 1 completed")
@@ -3824,12 +3929,21 @@ list(param=as.matrix(tab_param),stats=as.matrix(tab_simul_summarystat),weights=a
       write.table(as.numeric(seed_count-seed_count_ini),file=paste("n_simul_tot_step",it,sep=""),row.names=F,col.names=F,quote=F)
       write.table(as.numeric(p_acc),file=paste("p_acc_step",it,sep=""),row.names=F,col.names=F,quote=F) 
       write.table(as.numeric(tol_next),file=paste("tolerance_step",it,sep=""),row.names=F,col.names=F,quote=F)
+      intermediary_steps[[it]]=list(n_simul_tot=as.numeric(seed_count-seed_count_ini),tol_step=as.numeric(tol_next),p_acc=as.numeric(p_acc),posterior=as.matrix(cbind(tab_weight,simul_below_tol)))
     }
     if (progress_bar){
     		print(paste("step ",it," completed - p_acc = ",p_acc,sep=""))
     }
   }
-  list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs"))) 
+  
+  final_res=NULL
+  if (verbose==TRUE){
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs")),intermediary=intermediary_steps)
+  }
+  else{
+  	final_res=list(param=as.matrix(as.matrix(simul_below_tol)[,1:nparam]),stats=as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),weights=tab_weight/sum(tab_weight),stats_normalization=as.numeric(sd_simul),epsilon=max(.compute_dist(summary_stat_target,as.matrix(as.matrix(simul_below_tol)[,(nparam+1):(nparam+nstat)]),sd_simul)),nsim=(seed_count-seed_count_ini),computime=as.numeric(difftime(Sys.time(), start, units="secs"))) 
+  }
+  final_res
 }
 
 
@@ -3928,6 +4042,10 @@ function(method,model,prior,nb_simul,summary_stat_target,n_cluster,use_seed,verb
   tab_param=param_ini
   tab_simul_summary_stat=tab_simul_ini
   tab_dist=as.numeric(dist_ini)
+  if (verbose==TRUE){
+   	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
+  }
   for (is in 2:n_obs){
     for (i in 1:n_between_sampling){
       param=.move_particle_uni_uniform(as.numeric(param_ini),proposal_range,prior)
@@ -3946,7 +4064,8 @@ function(method,model,prior,nb_simul,summary_stat_target,n_cluster,use_seed,verb
     tab_param=rbind(tab_param,as.numeric(param_ini))
     tab_dist=rbind(tab_dist,as.numeric(dist_ini))
     if (verbose==TRUE){
-    	write.table(c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini)),file="output_mcmc",row.names=F,col.names=F,quote=F,append=T)
+   	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
      	if (is%%100==0){
       		print(paste(is," ",sep=""))
      	}
@@ -4129,6 +4248,10 @@ function(method,model,prior,nb_simul,summary_stat_target,n_cluster,use_seed,verb
   tab_simul_summary_stat=tab_simul_ini
   dist_ini=simuldist[(ord_sim[n_ini])]
   tab_dist=as.numeric(dist_ini)
+  if (verbose==TRUE){
+   	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
+  }
   for (is in 2:n_obs){
     for (i in 1:n_between_sampling){
       ## AM6
@@ -4164,7 +4287,8 @@ function(method,model,prior,nb_simul,summary_stat_target,n_cluster,use_seed,verb
     tab_param=rbind(tab_param,as.numeric(param_ini))
     tab_dist=rbind(tab_dist,as.numeric(dist_ini))
     if (verbose==TRUE){
-    	write.table(c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini)),file="output_mcmc",row.names=F,col.names=F,quote=F,append=T)
+   	intermed=c(as.numeric(param_ini),tab_simul_ini,as.numeric(dist_ini))
+    	write(intermed,file="output_mcmc",ncolumns=length(intermed),append=T)
      	if (is%%100==0){
       		print(paste(is," ",sep=""))
      	}
