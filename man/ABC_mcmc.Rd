@@ -7,7 +7,8 @@
 	This function implements three different algorithms to perform coupled to MCMC ABC.
 }
 \usage{
-	ABC_mcmc(method, model, prior, summary_stat_target, n_rec=100, n_between_sampling=10, n_cluster = 1, use_seed = FALSE, verbose = FALSE, ...)
+	ABC_mcmc(method, model, prior, summary_stat_target, n_rec=100,
+	n_between_sampling=10,	n_cluster = 1, use_seed = FALSE, verbose = FALSE, ...)
 }
 \arguments{
   \item{method}{
@@ -134,35 +135,43 @@
     toy_model<-function(x){ c( x[1] + x[2] + rnorm(1,0,0.1) , x[1] * x[2] + rnorm(1,0,0.1) ) }
 
     ## define prior information
-    toy_prior=list(c("unif",0,1),c("normal",1,2)) # a uniform prior distribution between 0 and 1 for parameter 1, and a normal distribution of mean 1 and standard deviation of 2 for parameter 2.
+    toy_prior=list(c("unif",0,1),c("normal",1,2))
+    # a uniform prior distribution between 0 and 1 for parameter 1, and a normal distribution
+    # of mean 1 and standard deviation of 2 for parameter 2.
 
     ## define the targeted summary statistics
     sum_stat_obs=c(1.5,0.5)
 
     ## to perform the Marjoram et al. (2003)'s method:
     ##
-    ABC_Marjoram_original<-ABC_mcmc(method="Marjoram_original", model=toy_model, prior=toy_prior, summary_stat_target=sum_stat_obs)
+    ABC_Marjoram_original<-ABC_mcmc(method="Marjoram_original", model=toy_model, prior=toy_prior,
+      summary_stat_target=sum_stat_obs)
     ABC_Marjoram_original
 
-    ## artificial example to perform the Marjoram et al. (2003)'s method, with modifications drawn from Wegmann et al. (2009) without Box-Cox and PLS transformations.
+    ## artificial example to perform the Marjoram et al. (2003)'s method, with modifications
+    # drawn from Wegmann et al. (2009) without Box-Cox and PLS transformations.
     ##
-    ABC_Marjoram<-ABC_mcmc(method="Marjoram", model=toy_model, prior=toy_prior, summary_stat_target=sum_stat_obs)
+    ABC_Marjoram<-ABC_mcmc(method="Marjoram", model=toy_model, prior=toy_prior,
+      summary_stat_target=sum_stat_obs)
     ABC_Marjoram
 
 
     ## artificial example to perform the Wegmann et al. (2009)'s method.
     ##
-    ABC_Wegmann<-ABC_mcmc(method="Wegmann", model=toy_model, prior=toy_prior, summary_stat_target=sum_stat_obs)
+    ABC_Wegmann<-ABC_mcmc(method="Wegmann", model=toy_model, prior=toy_prior,
+      summary_stat_target=sum_stat_obs)
     ABC_Wegmann
 
 
     ##### EXAMPLE 2 #####
     #####################
 
-    ## this time, the model is a C++ function packed into a R function -- this time, the option 'use_seed' must be turned to TRUE.
+    ## this time, the model is a C++ function packed into a R function -- this time,
+    # the option 'use_seed' must be turned to TRUE.
 
     ## define prior information
-    trait_prior=list(c("unif",500,500),c("unif",3,5),c("unif",-2.3,1.6),c("unif",1,1),c("unif",-25,125),c("unif",-0.7,3.2))
+    trait_prior=list(c("unif",500,500),
+      c("unif",3,5),c("unif",-2.3,1.6),c("unif",1,1),c("unif",-25,125),c("unif",-0.7,3.2))
     trait_prior
 
     ## define the targeted summary statistics
@@ -172,15 +181,19 @@
     ## artificial example to perform the Marjoram et al. (2003)'s method.
     ##
     n=10
-    ABC_Marjoram_original<-ABC_mcmc(method="Marjoram_original", model=trait_model, prior=trait_prior,  summary_stat_target=sum_stat_obs, n_rec=n, use_seed=TRUE)
+    ABC_Marjoram_original<-ABC_mcmc(method="Marjoram_original", model=trait_model,
+    prior=trait_prior, summary_stat_target=sum_stat_obs, n_rec=n, use_seed=TRUE)
     ABC_Marjoram_original
 
-    ## artificial example to perform the Marjoram et al. (2003)'s method, with modifications drawn from Wegmann et al. (2009) without Box-Cox and PLS transformations.
+    ## artificial example to perform the Marjoram et al. (2003)'s method, with modifications
+    # drawn from Wegmann et al. (2009) without Box-Cox and PLS transformations.
     ##
     n=10
     n_calib=10
     tol_quant=0.2 
-    ABC_Marjoram<-ABC_mcmc(method="Marjoram", model=trait_model, prior=trait_prior,  summary_stat_target=sum_stat_obs, n_rec=n, n_calibration=n_calib, tolerance_quantile=tol_quant, use_seed=TRUE)
+    ABC_Marjoram<-ABC_mcmc(method="Marjoram", model=trait_model, prior=trait_prior,
+      summary_stat_target=sum_stat_obs, n_rec=n, n_calibration=n_calib,
+      tolerance_quantile=tol_quant, use_seed=TRUE)
     ABC_Marjoram
 
 
@@ -189,7 +202,9 @@
     n=10
     n_calib=10
     tol_quant=0.2 
-    ABC_Wegmann<-ABC_mcmc(method="Wegmann", model=trait_model, prior=trait_prior,  summary_stat_target=sum_stat_obs, n_rec=n, n_calibration=n_calib, tolerance_quantile=tol_quant, use_seed=TRUE)
+    ABC_Wegmann<-ABC_mcmc(method="Wegmann", model=trait_model, prior=trait_prior,
+        summary_stat_target=sum_stat_obs, n_rec=n, n_calibration=n_calib,
+        tolerance_quantile=tol_quant, use_seed=TRUE)
     ABC_Wegmann
  }%dontrun
 }

@@ -9,7 +9,8 @@ binary_model_cluster<-function(command) {
     write.table(param,file=input_file_name,row.names=F,col.names=F,quote=F)
     system2(command,args=as.character(numclust))
     file.remove(input_file_name)
-    read.table(output_file_name,header=F)
+    output = read.table(output_file_name,header=F)
     file.remove(output_file_name)
+    output
   }
 }

@@ -167,7 +167,7 @@ void calculstat(double *stat,int *abondloc, int l, double **trait,double ntrait)
         stat[0]+=abondloc[i];
         if (abondloc[i]>0){
             stat[1]+=1;
-            stat[2]-=abondloc[i]*log(abondloc[i]);
+            stat[2]-=abondloc[i]*log(double(0.0+abondloc[i]));
         }
     }
     stat[2]+=stat[0]*log(stat[0]);

@@ -1,5 +1,19 @@
 == EasyABC changelog ==
 
+=== Version 1.2.2 - 3 June 2013 ===
+
+  * bugfix in data reading from system call in binary_model function (bug reported by Albert Ko)
+  * fixes for line width compliance with R-devel
+
+=== Version 1.2.1 - 17 May 2013 ===
+
+  * compilation fix for Solaris
+
+=== Version 1.2 - 27 February 2013 ===
+
+  * intermediary results are stored in a list for sequential algorithms (with the option verbose=TRUE)
+  * various minor corrections in the help files and in the vignette.
+
 === Version 1.1 - 29 January 2013 ===
 
   * simple toy model introduced for better examples

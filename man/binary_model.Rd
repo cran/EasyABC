@@ -30,7 +30,8 @@
 }
 \examples{
   \dontrun{%
-    ## artificial example to show how to use the binary_model function with an executable "My_Executable"
+    ## artificial example to show how to use the binary_model function with
+    # an executable "My_Executable"
     ABC_rej<-ABC_rejection(model=binary_model("./My_Executable"), prior=..., n_cluster=1,...)
 
     # NB: on windows, "My_Executable" should be of the form "My_Executable.exe" :
