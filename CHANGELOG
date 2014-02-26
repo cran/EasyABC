@@ -1,5 +1,13 @@
 == EasyABC changelog ==
 
+=== Version 1.3 ===
+
+  * bugfix in compute_dist methods (thanks to Matteo Fasiolo): variance is now fixed in a better way
+  * some code optimizations thanks to Matteo Fasiolo
+  * possibility to use user-defined prior distributions
+  * possibility to add constraints to prior distributions (e.g. parameter 1 < parameter 2)
+  * examples of how to link Java models or shell scripts to EasyABC
+
 === Version 1.2.2 - 3 June 2013 ===
 
   * bugfix in data reading from system call in binary_model function (bug reported by Albert Ko)

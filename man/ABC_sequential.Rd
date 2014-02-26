@@ -9,7 +9,7 @@
 }
 \usage{
 	ABC_sequential(method, model, prior, nb_simul, summary_stat_target,
-          n_cluster = 1, use_seed = FALSE, verbose = FALSE, ...)
+          prior_test=NULL, n_cluster = 1, use_seed = FALSE, verbose = FALSE, ...)
 }
 
 \arguments{
@@ -21,12 +21,17 @@
   \item{prior}{
     a list of prior information. Each element of the list corresponds to a model parameter. The list element must be a vector whose first argument determines the type of prior distribution: possible values are \code{"unif"} for a uniform distribution on a segment, \code{"normal"} for a normal distribution, \code{"lognormal"} for a lognormal distribution or \code{"exponential"} for an exponential distribution.
     The following arguments of the list elements contain the characteritiscs of the prior distribution chosen: for \code{"unif"}, two numbers must be given: the minimum and maximum values of the uniform distribution; for \code{"normal"}, two numbers must be given: the mean and standard deviation of the normal distribution; for \code{"lognormal"}, two numbers must be given: the mean and standard deviation on the log scale of the lognormal distribution; for \code{"exponential"}, one number must be given: the rate of the exponential distribution.
-    Note that when using the method "Lenormand", solely uniform prior distributions are supported.}
+    Note that when using the method "Lenormand", solely uniform prior distributions are supported. User-defined prior distributions can also be provided. See the vignette for additional information on this topic.}
   \item{nb_simul}{
     	a positive integer equal to the desired number of simulations of the model below the tolerance threshold when \code{method} is \code{"Beaumont"}, \code{"Drovandi"} and \code{"Delmoral"}.
 	When \code{method} is \code{"Lenormand"}, the number of simulations below the tolerance threshold is equal to \code{nb_simul * alpha}. See the package's vignette and Lenormand et al. (2012) for details.}
   \item{summary_stat_target}{
 	a vector containing the targeted (observed) summary statistics.}
+  \item{prior_test}{
+        a string expressing the constraints between model parameters.
+        This expression will be evaluated as a logical expression, you can use all the logical operators including \code{"<"}, \code{">"}, \ldots
+        Each parameter should be designated with \code{"X1"}, \code{"X2"}, \ldots in the same order as in the prior definition.
+        If not provided, no constraint will be applied.}
   \item{n_cluster}{
     a positive integer. If larger than 1 (the default value), \code{ABC_sequential} will launch \code{model} simulations in parallel on \code{n_cluster} cores of the computer.}
   \item{use_seed}{
@@ -227,8 +232,7 @@
     # 'use_seed' must be turned to TRUE.
     n=10
     ## define prior information
-    trait_prior=list(c("unif",500,500),c("unif",3,5),c("unif",-2.3,1.6),c("unif",1,1),
-      c("unif",-25,125),c("unif",-0.7,3.2))
+    trait_prior=list(c("unif",3,5),c("unif",-2.3,1.6),c("unif",-25,125),c("unif",-0.7,3.2))
     trait_prior
 
     ## define the targeted summary statistics
@@ -294,5 +298,5 @@
 \keyword{abc}
 \keyword{model}
 \keyword{inference}
-\keyword{sequential monte carlo}
-\keyword{population monte carlo}
+\keyword{sequential_monte_carlo}
+\keyword{population_monte_carlo}

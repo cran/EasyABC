@@ -7,7 +7,7 @@
 	This function implements three different algorithms to perform coupled to MCMC ABC.
 }
 \usage{
-	ABC_mcmc(method, model, prior, summary_stat_target, n_rec=100,
+	ABC_mcmc(method, model, prior, summary_stat_target, prior_test=NULL, n_rec=100,
 	n_between_sampling=10,	n_cluster = 1, use_seed = FALSE, verbose = FALSE, ...)
 }
 \arguments{
@@ -19,9 +19,14 @@
     A tutorial is provided in the package's vignette to dynamically link a binary code to a \code{R} function.  Users may alternatively wish to wrap their binary executables using the provided functions \code{\link{binary_model}} and \code{\link{binary_model_cluster}}. The use of these functions is associated with slightly different constraints on the design of the binary code (see \code{\link{binary_model}} and \code{\link{binary_model_cluster}}).}
   \item{prior}{
     a list of prior information. Each element of the list corresponds to a model parameter. The list element must be a vector whose first argument determines the type of prior distribution: possible values are \code{"unif"} for a uniform distribution on a segment, \code{"normal"} for a normal distribution, \code{"lognormal"} for a lognormal distribution or \code{"exponential"} for an exponential distribution.
-    The following arguments of the list elements contain the characteritiscs of the prior distribution chosen: for \code{"unif"}, two numbers must be given: the minimum and maximum values of the uniform distribution; for \code{"normal"}, two numbers must be given: the mean and standard deviation of the normal distribution; for \code{"lognormal"}, two numbers must be given: the mean and standard deviation on the log scale of the lognormal distribution; for \code{"exponential"}, one number must be given: the rate of the exponential distribution.}
+    The following arguments of the list elements contain the characteritiscs of the prior distribution chosen: for \code{"unif"}, two numbers must be given: the minimum and maximum values of the uniform distribution; for \code{"normal"}, two numbers must be given: the mean and standard deviation of the normal distribution; for \code{"lognormal"}, two numbers must be given: the mean and standard deviation on the log scale of the lognormal distribution; for \code{"exponential"}, one number must be given: the rate of the exponential distribution. User-defined prior distributions can also be provided. See the vignette for additional information on this topic.}
   \item{summary_stat_target}{
-	a vector containing the targeted (observed) summary statistics.}
+        a vector containing the targeted (observed) summary statistics.}
+  \item{prior_test}{
+        a string expressing the constraints between model parameters.
+        This expression will be evaluated as a logical expression, you can use all the logical operators including \code{"<"}, \code{">"}, \ldots
+        Each parameter should be designated with \code{"X1"}, \code{"X2"}, \ldots in the same order as in the prior definition.
+        If not provided, no constraint will be applied.}
   \item{n_rec}{
     	a positive integer equal to the desired number of sampled points along the MCMC.}
   \item{n_between_sampling}{
@@ -38,7 +43,7 @@
   \item{\dots}{Additional arguments can be passed depending on the choosen method (see below)}
 }
 
-\section{Additional paramaters}{
+\section{Additional parameters}{
   Depending on the choosen method, you can specify the following arguments:
   \describe{
     \item{dist_max}{
@@ -113,7 +118,7 @@
   	The standard deviations of Box-Cox transforms, given when \code{method} is \code{"Wegmann"}.}
   \item{pls_transform}{
   	The matrix of PLS transformation, given when \code{method} is \code{"Wegmann"}.}
-  \item{n_component}{
+  \item{numcomp}{
   	The number of used components for the PLS transformation, given when \code{method} is \code{"Wegmann"}.}
 }
 \references{
@@ -170,8 +175,7 @@
     # the option 'use_seed' must be turned to TRUE.
 
     ## define prior information
-    trait_prior=list(c("unif",500,500),
-      c("unif",3,5),c("unif",-2.3,1.6),c("unif",1,1),c("unif",-25,125),c("unif",-0.7,3.2))
+    trait_prior=list(c("unif",3,5),c("unif",-2.3,1.6),c("unif",-25,125),c("unif",-0.7,3.2))
     trait_prior
 
     ## define the targeted summary statistics
