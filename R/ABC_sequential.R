@@ -9,6 +9,9 @@ ABC_sequential <- function(method, model, prior, nb_simul, summary_stat_target, 
         stop("'model' is missing")
     if (missing(prior)) 
         stop("'prior' is missing")
+    data = .wrap_constants_in_model(prior, model, use_seed)
+    prior = data$new_prior
+    model = data$new_model
     prior = .process_prior(prior)
     if (!is.null(prior_test))
         .check_prior_test(length(prior), prior_test)

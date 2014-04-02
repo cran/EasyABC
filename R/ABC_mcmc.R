@@ -11,6 +11,9 @@ ABC_mcmc <- function(method, model, prior, summary_stat_target, prior_test=NULL,
         stop("'prior' is missing")
     if (!is.null(prior_test))
         .check_prior_test(length(prior), prior_test)
+    data = .wrap_constants_in_model(prior, model, use_seed)
+    prior = data$new_prior
+    model = data$new_model
     prior = .process_prior(prior)
     if (missing(summary_stat_target)) 
         stop("'summary_stat_target' is missing")

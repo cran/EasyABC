@@ -129,7 +129,7 @@
   \code{\link{binary_model}}, \code{\link{binary_model_cluster}}, \code{\link{ABC_rejection}}, \code{\link{ABC_mcmc}}
 }
 \examples{
- \dontrun{
+ \dontrun{ 
     ##### EXAMPLE 1 #####
     #####################
     set.seed(1)

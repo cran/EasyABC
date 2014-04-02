@@ -9,6 +9,9 @@ ABC_rejection <- function(model, prior, nb_simul, prior_test = NULL, summary_sta
         stop("'prior' is missing")
     if (!is.null(prior_test))
         .check_prior_test(length(prior), prior_test)
+    data = .wrap_constants_in_model(prior, model, use_seed)
+    prior = data$new_prior
+    model = data$new_model
     prior = .process_prior(prior)
     if (missing(nb_simul)) 
         stop("'nb_simul' is missing")

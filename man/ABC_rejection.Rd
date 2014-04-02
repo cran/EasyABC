@@ -97,7 +97,7 @@
 
     ## NB: see the package's vignette to see how to pipeline 'ABC_rejection' with the function
     # 'abc' of the package 'abc' to perform other rejection schemes.
- \dontrun{
+ \dontrun{ 
 
     ##### EXAMPLE 2 #####
     #####################

@@ -42,13 +42,6 @@
                 prior[[i]][[2]][1], prior[[i]][[2]][-1])
         } else {
             if (any(prior[[i]][1] == c("unif", "normal", "lognormal", "exponential"))) {
-                if (prior[[i]][1] == "unif") {
-                  if (prior[[i]][2] == prior[[i]][3]) {
-                    stop(paste("Wrong parameters for the uniform prior (min=max). See in the documentation how to fix constant parameters for your model. Your prior definition: ", 
-                      prior, sep = ""))
-                  }
-                  new_prior[[i]] = c("runif", 1, "dunif", prior[[i]][2], prior[[i]][3])
-                }
                 if (prior[[i]][1] == "exponential") {
                   if (length(prior[[i]]) != 2) {
                     stop(paste("Incomplete prior information for parameter ", i, 
@@ -69,6 +62,33 @@
         }
     }
     new_prior
+}
+
+.wrap_constants_in_model = function(prior, model, use_seed) {
+    nb_parameters = length(prior)
+    # detecting constants defined as c("unif",value,value)
+    constants_mask = array(FALSE,nb_parameters)
+    constants_values = list()
+    for (i in 1:nb_parameters) {
+        if ((prior[[i]][1]=="unif")&&(as.numeric(prior[[i]][2])==as.numeric(prior[[i]][3]))) {
+            constants_mask[i] = TRUE
+            constants_values = append(constants_values, as.numeric(prior[[i]][2]))
+        }
+    }
+    constants_values = unlist(constants_values)
+    new_prior=prior[!constants_mask]
+    if (use_seed) {
+      constants_mask = c(FALSE, constants_mask)
+      nb_parameters = nb_parameters + 1
+    }
+    old_model=model
+    # returning the prior without constants, and a new function that wraps the model with the constants
+    list(new_prior=new_prior, new_model=function(parameters) {
+        param_with_constants = array(0,nb_parameters)
+        param_with_constants[constants_mask] = constants_values
+        param_with_constants[!constants_mask] = parameters
+        old_model(param_with_constants)
+    })
 }
 
 ## function to compute a distance between a matrix of simulated statistics (row:
@@ -4643,17 +4663,17 @@
 
 ## FUNCTION ABC_mcmc: ABC coupled to MCMC (Marjoram et al. 2003, Wegmann et al.
 ## 2009)
-.ABC_mcmc_cluster <- function(method, model, prior, n_obs, n_between_sampling, summary_stat_target, 
-    n_cluster = 1, use_seed, verbose, ...) {
+.ABC_mcmc_cluster <- function(method, model, prior, prior_test, n_obs, n_between_sampling,
+    summary_stat_target, n_cluster = 1, use_seed, verbose, ...) {
     if (use_seed == FALSE) {
         stop("For parallel implementations, you must specify the option 'use_seed=TRUE' and modify your model accordingly - see the package's vignette for more details.")
     }
     options(scipen = 50)
     # library(parallel) Note that we do not consider the original Marjoram's
     # algortithm, which is not prone to parallel computing. (no calibration step)
-    return(switch(EXPR = method, Marjoram = .ABC_MCMC2_cluster(model, prior, n_obs, 
+    return(switch(EXPR = method, Marjoram = .ABC_MCMC2_cluster(model, prior, prior_test, n_obs, 
         n_between_sampling, summary_stat_target, n_cluster, verbose, ...), Wegmann = .ABC_MCMC3_cluster(model, 
-        prior, n_obs, n_between_sampling, summary_stat_target, n_cluster, verbose, 
+        prior, prior_test, n_obs, n_between_sampling, summary_stat_target, n_cluster, verbose, 
         ...)))
     options(scipen = 0)
 }
