@@ -9,12 +9,13 @@
 }
 \usage{
 	ABC_sequential(method, model, prior, nb_simul, summary_stat_target,
-          prior_test=NULL, n_cluster = 1, use_seed = FALSE, verbose = FALSE, ...)
+          prior_test=NULL, n_cluster = 1, use_seed = FALSE, verbose = FALSE,
+          dist_weights=NULL, ...)
 }
 
 \arguments{
   \item{method}{
-	a character string indicating the sequential algorithm to be used. Possible values are \code{"Beaumont"}, \code{"Drovandi"}, \code{"Delmoral"} and \code{"Lenormand"}.}
+	a character string indicating the sequential algorithm to be used. Possible values are \code{"Beaumont"}, \code{"Drovandi"}, \code{"Delmoral"}, \code{"Lenormand"} and \code{"Emulation"}.}
   \item{model}{
     a \code{R} function implementing the model to be simulated. It must take as arguments a vector of model parameter values and it must return a vector of summary statistics. When using the option \code{use_seed=TRUE}, \code{model} must take as arguments a vector containing a seed value and the model parameter values.
     A tutorial is provided in the package's vignette to dynamically link a binary code to a \code{R} function.  Users may alternatively wish to wrap their binary executables using the provided functions \code{\link{binary_model}} and \code{\link{binary_model_cluster}}. The use of these functions is associated with slightly different constraints on the design of the binary code (see \code{\link{binary_model}} and \code{\link{binary_model_cluster}}).}
@@ -44,26 +45,32 @@
     The file "R_step_iteration" (when using the method "Drovandi") is the parameter R used during the step "iteration" (see Drovandi and Pettitt 2011 for details).
     The file "p_acc_iteration" (when using the method "Lenormand") is the parameter p_acc computed at the end of the step "iteration" (see Lenormand et al. 2012 for details).
     The file "tolerance_step_iteration" (when using the method "Drovandi", "Delmoral" or "Lenormand") is the tolerance computed at the end of the step "iteration".
-    The file "output_step_iteration"  has a matrix format, in wich each raw is a different simulation, the first column is the weight of the simulation, the following columns are the parameters used for this simulation, and the last columns are the summary statistics of this simulation.
+    The file "output_step_iteration" gives the simulations kept after each iteration and has a matrix format, in wich each row is a different simulation, the first column is the weight of the simulation, the following columns are the parameters used for this simulation, and the last columns are the summary statistics of this simulation.
+    The file "model_step_iteration" gives the simulations performed at each iteration and has a matrix format, in which each row is a different simulation, the first column is the weight of the simulation, the following columns are the parameters used for this simulation, and the last columns are the summary statistics of this simulation.
     All these informations are further stored in a list (with the same formats) and are accessible from R - see \code{intermediary} in the value section below.}
+  \item{dist_weights}{
+    a vector containing the weights to apply to the distance between the computed and the targeted statistics.
+    These weights can be used to give more importance to a summary statistisc for example. The weights will
+    be normalized before applying them. If not provided, no weights will be applied.
+  }
   \item{\dots}{Additional arguments can be passed depending on the choosen method (see below)}
 }
 
-\section{Additional paramaters}{
+\section{Additional parameters}{
   Depending on the choosen method, you can specify the following arguments:
   \describe{
     \item{seed_count}{
 	  a positive integer, the initial seed value provided to the function \code{model} (if \code{use_seed=TRUE}). This value is incremented by 1 at each call of the function \code{model}.}
     \item{inside_prior}{
-	  logical used when \code{method} is \code{"Beaumont"} or \code{"Lenormand"}. \code{TRUE} by default.
+	  logical used when \code{method} is \code{"Beaumont"}, \code{"Lenormand"} or \code{"Emulation"}. \code{TRUE} by default.
 	  If \code{FALSE}, parameter sampling is not restricted to the initial ranges of the prior distribution during the subsequent algorithm steps.}
     \item{tolerance_tab}{
 	  a vector containing the sequence of tolerance thresholds when \code{method} is \code{"Beaumont"}, or the targeted final tolerance threshold when \code{method} is \code{"Drovandi"}.}
     \item{alpha}{
-	  a positive number between 0 and 1 (strictly) used when \code{method} is \code{"Drovandi"}, \code{"Delmoral"} or \code{"Lenormand"}.
+	  a positive number between 0 and 1 (strictly) used when \code{method} is \code{"Drovandi"}, \code{"Delmoral"}, \code{"Lenormand"} or \code{"Emulation"}.
 	  \code{alpha} is the proportion of particles rejected at each step in the algorithm \code{"Drovandi"}.
-	  This is the proportion of particles kept at each step in the algorithms \code{"Delmoral"} and \code{"Lenormand"}.
-	  Default values are 0.5 when \code{method} is \code{"Drovandi"} or \code{"Lenormand"} and 0.9 for \code{"Delmoral"}.
+	  This is the proportion of particles kept at each step in the algorithms \code{"Delmoral"}, \code{"Lenormand"} and \code{"Emulation"}.
+	  Default values are 0.5 when \code{method} is \code{"Drovandi"}, \code{"Lenormand"} or \code{"Emulation"} and 0.9 for \code{"Delmoral"}.
 	  See the package's vignette for details.}
     \item{c}{
 	  a positive number between 0 and 1 (strictly) used when \code{method} is \code{"Drovandi"}.
@@ -85,9 +92,16 @@
 	  a positive number used when \code{method} is \code{"Delmoral"}.
 	  This is the targeted final tolerance threshold.}
     \item{p_acc_min}{
-	  a positive number between 0 and 1 (strictly) used when \code{method} is \code{"Lenormand"}.
+	  a positive number between 0 and 1 (strictly) used when \code{method} is \code{"Lenormand"} or \code{"Emulation"}.
 	  This is the stopping criterion of the algorithm: a small number ensures a better convergence of the algorithm, but at a cost in computing time.
 	  Default value is 0.05. See the package's vignette and Lenormand et al. (2012) for details.}
+    \item{n_step_emulation}{
+          a positive integer, the number of times the emulation is repeated. \code{9} by default.
+          }
+    \item{emulator_span}{
+          a positive number, the number of design points selected for the local regression.
+          \code{50} by default.
+          }
     \item{progress_bar}{
       logical, \code{FALSE} by default. If \code{TRUE}, \code{ABC_sequential} will output a bar of progression with the estimated remaining computing time. Option not available with multiple cores.}
   }
@@ -123,10 +137,12 @@
 	Drovandi, C. C. and Pettitt, A. N. (2011) Estimation of parameters for macroparasite population evolution using approximate Bayesian computation. \emph{Biometrics}, \bold{67}, 225--233.
 
 	Lenormand, M., Jabot, F., Deffuant G. (2012) Adaptive approximate Bayesian computation for complex models. http://arxiv.org/pdf/1111.1308.pdf
+	
+	Jabot, F., Lagarrigues G., Courbaud B., Dumoulin N. (2015). A comparison of emulation methods for Approximate Bayesian Computation. To be published.
 }
 \author{Franck Jabot, Thierry Faure and Nicolas Dumoulin}
 \seealso{
-  \code{\link{binary_model}}, \code{\link{binary_model_cluster}}, \code{\link{ABC_rejection}}, \code{\link{ABC_mcmc}}
+  \code{\link{binary_model}}, \code{\link{binary_model_cluster}}, \code{\link{ABC_rejection}}, \code{\link{ABC_emulation}}, \code{\link{ABC_mcmc}}
 }
 \examples{
  \dontrun{ 

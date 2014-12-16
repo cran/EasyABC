@@ -1,13 +1,13 @@
 ## FUNCTION ABC_rejection: brute-force ABC (Pritchard et al. 1999)
-ABC_rejection <- function(model, prior, nb_simul, prior_test = NULL, summary_stat_target = NULL,
-    tol = NULL, use_seed = FALSE, seed_count = 0, n_cluster = 1, verbose = FALSE,
+ABC_rejection <- function(model, prior, nb_simul, prior_test = NULL, summary_stat_target = NULL, 
+    tol = NULL, use_seed = FALSE, seed_count = 0, n_cluster = 1, verbose = FALSE, 
     progress_bar = FALSE) {
     ## checking errors in the inputs
     if (missing(model)) 
         stop("'model' is missing")
     if (missing(prior)) 
         stop("'prior' is missing")
-    if (!is.null(prior_test))
+    if (!is.null(prior_test)) 
         .check_prior_test(length(prior), prior_test)
     data = .wrap_constants_in_model(prior, model, use_seed)
     prior = data$new_prior
@@ -49,14 +49,14 @@ ABC_rejection <- function(model, prior, nb_simul, prior_test = NULL, summary_sta
         stop("'tol' is missing")
     }
     if (n_cluster == 1) {
-        rejection = .ABC_rejection(model, prior, prior_test, nb_simul, use_seed, seed_count, 
-            verbose, progress_bar)
+        rejection = .ABC_rejection(model, prior, prior_test, nb_simul, use_seed, 
+            seed_count, verbose, progress_bar)
     } else {
         if (use_seed == FALSE) {
             stop("For parallel implementations, you must specify the option 'use_seed=TRUE' and modify your model accordingly - see the package's vignette for more details.")
         }
-        rejection = .ABC_rejection_cluster(model, prior, prior_test, nb_simul, seed_count, n_cluster, 
-            verbose)
+        rejection = .ABC_rejection_cluster(model, prior, prior_test, nb_simul, seed_count, 
+            n_cluster, verbose)
     }
     res = NULL
     if (is.null(summary_stat_target)) {

@@ -2,6 +2,7 @@
 export(trait_model)
 useDynLib(EasyABC)
 export(ABC_rejection)
+export(ABC_emulation)
 export(ABC_sequential)
 export(ABC_mcmc)
 export(binary_model)

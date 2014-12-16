@@ -66,25 +66,26 @@
 
 .wrap_constants_in_model = function(prior, model, use_seed) {
     nb_parameters = length(prior)
-    # detecting constants defined as c("unif",value,value)
-    constants_mask = array(FALSE,nb_parameters)
+    # detecting constants defined as c('unif',value,value)
+    constants_mask = array(FALSE, nb_parameters)
     constants_values = list()
     for (i in 1:nb_parameters) {
-        if ((prior[[i]][1]=="unif")&&(as.numeric(prior[[i]][2])==as.numeric(prior[[i]][3]))) {
+        if ((prior[[i]][1] == "unif") && (as.numeric(prior[[i]][2]) == as.numeric(prior[[i]][3]))) {
             constants_mask[i] = TRUE
             constants_values = append(constants_values, as.numeric(prior[[i]][2]))
         }
     }
     constants_values = unlist(constants_values)
-    new_prior=prior[!constants_mask]
+    new_prior = prior[!constants_mask]
     if (use_seed) {
-      constants_mask = c(FALSE, constants_mask)
-      nb_parameters = nb_parameters + 1
+        constants_mask = c(FALSE, constants_mask)
+        nb_parameters = nb_parameters + 1
     }
-    old_model=model
-    # returning the prior without constants, and a new function that wraps the model with the constants
-    list(new_prior=new_prior, new_model=function(parameters) {
-        param_with_constants = array(0,nb_parameters)
+    old_model = model
+    # returning the prior without constants, and a new function that wraps the model
+    # with the constants
+    list(new_prior = new_prior, new_model = function(parameters) {
+        param_with_constants = array(0, nb_parameters)
         param_with_constants[constants_mask] = constants_values
         param_with_constants[!constants_mask] = parameters
         old_model(param_with_constants)
@@ -94,7 +95,7 @@
 ## function to compute a distance between a matrix of simulated statistics (row:
 ## different simulations, columns: different summary statistics) and the array of
 ## data summary statistics
-.compute_dist <- function(summary_stat_target, simul, sd_simul) {
+.compute_dist <- function(summary_stat_target, simul, sd_simul, dist_weights=NULL) {
     l = length(summary_stat_target)
     # If simul is not a matrix (which happens when l == 1) we tranform it into a
     # matrix
@@ -105,6 +106,9 @@
             simul <- matrix(simul, 1, length(simul))
         }
     }
+    if (!is.null(dist_weights)) {
+        simul = simul * (dist_weights/sum(dist_weights))
+    }
     vartab = sd_simul^2
     # Ensure positivity of variances: the elements of vartab that are close to zero
     # are set to one
@@ -114,8 +118,8 @@
 
 ## function to select the simulations that are at a distance smaller than tol from
 ## the data
-.selec_simul <- function(summary_stat_target, param, simul, sd_simul, tol) {
-    dist = .compute_dist(summary_stat_target, simul, sd_simul)
+.selec_simul <- function(summary_stat_target, param, simul, sd_simul, tol, dist_weights) {
+    dist = .compute_dist(summary_stat_target, simul, sd_simul, dist_weights=dist_weights)
     ll = length(dist[dist < tol])
     # select data with type checking
     select_data = function(data) {
@@ -195,9 +199,9 @@
     m = gregexpr("[xX]([0-9])+", prior_test)
     result = regmatches(prior_test, m)
     for (i in 1:length(result[[1]])) {
-        parameter_index = substring(result[[1]][i],2)
-        if (parameter_index>nb_parameters) {
-            stop(paste("Parameter out of range: ",result[[1]][i],sep=""))
+        parameter_index = substring(result[[1]][i], 2)
+        if (parameter_index > nb_parameters) {
+            stop(paste("Parameter out of range: ", result[[1]][i], sep = ""))
         }
     }
     TRUE
@@ -205,25 +209,25 @@
 
 ## test if the sampled parameter is passing the constraint test (if given by user)
 .is_in_parameter_constraints <- function(parameter, test) {
-    is.null(test) || eval(parse(text=gsub("[xX]([0-9]+)",'parameter[\\1]',test)))
+    is.null(test) || eval(parse(text = gsub("[xX]([0-9]+)", "parameter[\\1]", test)))
 }
 
-## sample according to the prior definition, a test can be given as "x1 < x2"
+## sample according to the prior definition, a test can be given as 'x1 < x2'
 .sample_prior <- function(prior, test) {
     l = length(prior)
     param = NULL
-    test_passed=FALSE
+    test_passed = FALSE
     while (!test_passed) {
-      for (i in 1:l) {
-          param[i] = prior[[i]]$sampling()
-      }
-      test_passed = .is_in_parameter_constraints(param,test)
+        for (i in 1:l) {
+            param[i] = prior[[i]]$sampling()
+        }
+        test_passed = .is_in_parameter_constraints(param, test)
     }
     param
 }
 
-.ABC_rejection_internal <- function(model, prior, prior_test, nb_simul, use_seed, seed_count,
-    verbose = FALSE, progressbarwidth = 0) {
+.ABC_rejection_internal <- function(model, prior, prior_test, nb_simul, use_seed, 
+    seed_count, verbose = FALSE, progressbarwidth = 0) {
     options(scipen = 50)
     tab_simul_summarystat = NULL
     tab_param = NULL
@@ -478,16 +482,16 @@
 }
 
 ## FUNCTION ABC_rejection: brute-force ABC (Pritchard et al. 1999)
-.ABC_rejection <- function(model, prior, prior_test, nb_simul, use_seed, seed_count, verbose, 
-    progress_bar) {
+.ABC_rejection <- function(model, prior, prior_test, nb_simul, use_seed, seed_count, 
+    verbose, progress_bar) {
     nb_simul = floor(nb_simul)
     seed_count = floor(seed_count)
     pgwidth = 0
     if (progress_bar) {
         pgwidth = 50
     }
-    rejection = .ABC_rejection_internal(model, prior, prior_test, nb_simul, use_seed, seed_count, 
-        verbose, progressbarwidth = pgwidth)
+    rejection = .ABC_rejection_internal(model, prior, prior_test, nb_simul, use_seed, 
+        seed_count, verbose, progressbarwidth = pgwidth)
     sd_simul = sapply(as.data.frame(rejection$summarystat), sd)
     list(param = rejection$param, stats = as.matrix(rejection$summarystat), weights = array(1/nb_simul, 
         nb_simul), stats_normalization = as.numeric(sd_simul), nsim = nb_simul, computime = as.numeric(difftime(Sys.time(), 
@@ -495,8 +499,8 @@
 }
 
 ## PMC ABC algorithm: Beaumont et al. Biometrika 2009
-.ABC_PMC <- function(model, prior, prior_test, nb_simul, summary_stat_target, use_seed, verbose, 
-    seed_count = 0, inside_prior = TRUE, tolerance_tab = -1, progress_bar = FALSE) {
+.ABC_PMC <- function(model, prior, prior_test, nb_simul, summary_stat_target, use_seed, 
+    verbose, dist_weights=NULL, seed_count = 0, inside_prior = TRUE, tolerance_tab = -1, progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(seed_count)) 
         stop("'seed_count' has to be a number.")
@@ -537,23 +541,23 @@
     while (nb_simul_step > 0) {
         if (nb_simul_step > 1) {
             # classic ABC step
-            tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, use_seed, 
-                seed_count)
+            tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, 
+                use_seed, seed_count)
             if (nb_simul_step == nb_simul) {
                 sd_simul = sapply(as.data.frame(tab_ini$summarystat), sd)  # determination of the normalization constants in each dimension associated to each summary statistic, this normalization will not change during all the algorithm
             }
             seed_count = seed_count + nb_simul_step
             # selection of simulations below the first tolerance level
             simul_below_tol = rbind(simul_below_tol, .selec_simul(summary_stat_target, 
-                tab_ini$param, tab_ini$summarystat, sd_simul, tolerance_tab[1]))
+                tab_ini$param, tab_ini$summarystat, sd_simul, tolerance_tab[1], dist_weights=dist_weights))
             if (length(simul_below_tol) > 0) {
                 nb_simul_step = nb_simul - dim(simul_below_tol)[1]
             }
         } else {
-            tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, use_seed, 
-                seed_count)
+            tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, 
+                use_seed, seed_count)
             seed_count = seed_count + nb_simul_step
-            if (.compute_dist(summary_stat_target, tab_ini$summarystat, sd_simul) < 
+            if (.compute_dist(summary_stat_target, tab_ini$summarystat, sd_simul, dist_weights=dist_weights) < 
                 tolerance_tab[1]) {
                 simul_below_tol = rbind(simul_below_tol, cbind(tab_ini$param, tab_ini$summarystat))
                 nb_simul_step = 0
@@ -586,7 +590,7 @@
                 seed_count = seed_count + nb_simul_step
                 simul_below_tol2 = rbind(simul_below_tol2, .selec_simul(summary_stat_target, 
                   tab_ini[, 1:nparam], tab_ini[, (nparam + 1):(nparam + nstat)], 
-                  sd_simul, tolerance_tab[it]))
+                  sd_simul, tolerance_tab[it], dist_weights=dist_weights))
                 if (length(simul_below_tol2) > 0) {
                   nb_simul_step = nb_simul - dim(simul_below_tol2)[1]
                 }
@@ -595,7 +599,7 @@
                   1:nparam]), tab_weight, nb_simul_step, use_seed, seed_count, inside_prior)
                 seed_count = seed_count + nb_simul_step
                 if (.compute_dist(summary_stat_target, tab_ini[(nparam + 1):(nparam + 
-                  nstat)], sd_simul) < tolerance_tab[it]) {
+                  nstat)], sd_simul, dist_weights=dist_weights) < tolerance_tab[it]) {
                   simul_below_tol2 = rbind(simul_below_tol2, tab_ini)
                   nb_simul_step = 0
                 }
@@ -631,14 +635,14 @@
         final_res = list(param = as.matrix(simul_below_tol[, 1:nparam]), stats = as.matrix(simul_below_tol[, 
             (nparam + 1):(nparam + nstat)]), weights = tab_weight/sum(tab_weight), 
             stats_normalization = as.numeric(sd_simul), epsilon = max(.compute_dist(summary_stat_target, 
-                as.matrix(simul_below_tol[, (nparam + 1):(nparam + nstat)]), sd_simul)), 
+                as.matrix(simul_below_tol[, (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), 
             nsim = (seed_count - seed_count_ini), computime = as.numeric(difftime(Sys.time(), 
                 start, units = "secs")), intermediary = intermediary_steps)
     } else {
         final_res = list(param = as.matrix(simul_below_tol[, 1:nparam]), stats = as.matrix(simul_below_tol[, 
             (nparam + 1):(nparam + nstat)]), weights = tab_weight/sum(tab_weight), 
             stats_normalization = as.numeric(sd_simul), epsilon = max(.compute_dist(summary_stat_target, 
-                as.matrix(simul_below_tol[, (nparam + 1):(nparam + nstat)]), sd_simul)), 
+                as.matrix(simul_below_tol[, (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), 
             nsim = (seed_count - seed_count_ini), computime = as.numeric(difftime(Sys.time(), 
                 start, units = "secs")))
     }
@@ -646,34 +650,34 @@
 }
 
 ## function to select the alpha quantile closest simulations
-.selec_simul_alpha <- function(summary_stat_target, param, simul, sd_simul, alpha) {
-    dist = .compute_dist(summary_stat_target, simul, sd_simul)
+.selec_simul_alpha <- function(summary_stat_target, param, simul, sd_simul, alpha, dist_weights) {
+    dist = .compute_dist(summary_stat_target, simul, sd_simul, dist_weights=dist_weights)
     n_alpha = ceiling(alpha * length(dist))
     tol = sort(dist)[n_alpha]
-    ll = length(dist[dist < tol])
+    ll = length(dist[!is.na(dist) & dist < tol])
     if (ll == 0) {
         param2 = NULL
         simul2 = NULL
     } else {
         if (!is.null(dim(param)[1])) {
             if (ll > 1) {
-                param2 = param[dist <= tol, ]
+                param2 = param[!is.na(dist) & dist <= tol, ]
             } else {
-                param2 = as.matrix(param[dist <= tol, ])
+                param2 = as.matrix(param[!is.na(dist) & dist <= tol, ])
                 dim(param2) = c(dim(param2)[2], dim(param2)[1])
             }
         } else {
-            param2 = as.matrix(param[dist <= tol])
+            param2 = as.matrix(param[!is.na(dist) & dist <= tol])
         }
         if (!is.null(dim(simul)[1])) {
             if (ll > 1) {
-                simul2 = simul[dist <= tol, ]
+                simul2 = simul[!is.na(dist) & dist <= tol, ]
             } else {
-                simul2 = as.matrix(simul[dist <= tol, ])
+                simul2 = as.matrix(simul[!is.na(dist) & dist <= tol, ])
                 dim(simul2) = c(dim(simul2)[2], dim(simul2)[1])
             }
         } else {
-            simul2 = as.matrix(simul[dist <= tol])
+            simul2 = as.matrix(simul[!is.na(dist) & dist <= tol])
         }
     }
     cbind(param2, simul2)
@@ -681,8 +685,8 @@
 
 ## function to select the simulations that are at a distance smaller are equal to
 ## tol from the data
-.selec_simulb <- function(summary_stat_target, param, simul, sd_simul, tol) {
-    dist = .compute_dist(summary_stat_target, simul, sd_simul)
+.selec_simulb <- function(summary_stat_target, param, simul, sd_simul, tol, dist_weights) {
+    dist = .compute_dist(summary_stat_target, simul, sd_simul, dist_weights=dist_weights)
     ll = length(dist[dist <= tol])
     if (ll == 0) {
         param2 = NULL
@@ -714,9 +718,9 @@
 
 ## sequential algorithm of Drovandi & Pettitt 2011 - the proposal used is a
 ## multivariate normal (cf paragraph 2.2 - p. 227 in Drovandi & Pettitt 2011)
-.ABC_Drovandi <- function(model, prior, prior_test, nb_simul, summary_stat_target, use_seed, 
-    verbose, tolerance_tab = -1, alpha = 0.5, c = 0.01, first_tolerance_level_auto = TRUE, 
-    seed_count = 0, progress_bar = FALSE) {
+.ABC_Drovandi <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
+    use_seed, verbose, tolerance_tab = -1, alpha = 0.5, c = 0.01, first_tolerance_level_auto = TRUE, 
+    dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(tolerance_tab)) 
         stop("'tolerance_tab' has to be a vector.")
@@ -782,36 +786,36 @@
     simul_below_tol = NULL
     if (first_tolerance_level_auto) {
         # classic ABC step
-        tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, use_seed, 
-            seed_count, progressbarwidth)
+        tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, 
+            use_seed, seed_count, progressbarwidth)
         sd_simul = sapply(as.data.frame(tab_ini$summarystat), sd)  # determination of the normalization constants in each dimension associated to each summary statistic, this normalization will not change during all the algorithm
         seed_count = seed_count + nb_simul_step
         # selection of simulations below the first tolerance level
         simul_below_tol = rbind(simul_below_tol, .selec_simul_alpha(summary_stat_target, 
-            tab_ini$param, tab_ini$summarystat, sd_simul, (1 - alpha)))
+            tab_ini$param, tab_ini$summarystat, sd_simul, (1 - alpha), dist_weights=dist_weights))
         simul_below_tol = as.matrix(simul_below_tol[1:nb_simul, ])  # to be sure that there are not two or more simulations at a distance equal to the tolerance determined by the quantile
     } else {
         nb_simul_step = nb_simul
         while (nb_simul_step > 0) {
             if (nb_simul_step > 1) {
                 # classic ABC step
-                tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, use_seed, 
-                  seed_count)
+                tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, 
+                  use_seed, seed_count)
                 if (nb_simul_step == nb_simul) {
                   sd_simul = sapply(as.data.frame(tab_ini$summarystat), sd)  # determination of the normalization constants in each dimension associated to each summary statistic, this normalization will not change during all the algorithm
                 }
                 seed_count = seed_count + nb_simul_step
                 # selection of simulations below the first tolerance level
                 simul_below_tol = rbind(simul_below_tol, .selec_simulb(summary_stat_target, 
-                  tab_ini$param, tab_ini$summarystat, sd_simul, tolerance_tab[1]))  # we authorize the simulation to be equal to the tolerance level, for consistency with the quantile definition of the tolerance
+                  tab_ini$param, tab_ini$summarystat, sd_simul, tolerance_tab[1], dist_weights=dist_weights))  # we authorize the simulation to be equal to the tolerance level, for consistency with the quantile definition of the tolerance
                 if (length(simul_below_tol) > 0) {
                   nb_simul_step = nb_simul - dim(simul_below_tol)[1]
                 }
             } else {
-                tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, use_seed, 
-                  seed_count)
+                tab_ini = .ABC_rejection_internal(model, prior, prior_test, nb_simul_step, 
+                  use_seed, seed_count)
                 seed_count = seed_count + nb_simul_step
-                if (.compute_dist(summary_stat_target, tab_ini$summarystat, sd_simul) <= 
+                if (.compute_dist(summary_stat_target, tab_ini$summarystat, sd_simul, dist_weights=dist_weights) <= 
                   tolerance_tab[1]) {
                   simul_below_tol = rbind(simul_below_tol, cbind(tab_ini$param, tab_ini$summarystat))
                   nb_simul_step = 0
@@ -837,7 +841,7 @@
     tol_next = tolerance_tab[1]
     if (first_tolerance_level_auto) {
         tol_next = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul))
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights))
     }
     R = 1
     l = dim(simul_below_tol)[2]
@@ -848,11 +852,11 @@
         nb_simul_step = n_alpha
         # compute epsilon_next
         tol_next = sort(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul))[(nb_simul - n_alpha)]
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights))[(nb_simul - n_alpha)]
         # drop the n_alpha poorest particles
         simul_below_tol2 = .selec_simulb(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
             1:nparam]), as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
-            nstat)]), sd_simul, tol_next)  # we authorize the simulation to be equal to the tolerance level, for consistency with the quantile definition of the tolerance
+            nstat)]), sd_simul, tol_next, dist_weights=dist_weights)  # we authorize the simulation to be equal to the tolerance level, for consistency with the quantile definition of the tolerance
         simul_below_tol = matrix(0, (nb_simul - n_alpha), (nparam + nstat))
         for (i1 in 1:(nb_simul - n_alpha)) {
             for (i2 in 1:(nparam + nstat)) {
@@ -887,7 +891,7 @@
                 }
                 # check whether it is below tol_next and undo the move if it is not
                 if (.compute_dist(summary_stat_target, as.numeric(new_simul[(nparam + 
-                  1):(nparam + nstat)]), sd_simul) <= tol_next) {
+                  1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights) <= tol_next) {
                   # we authorize the simulation to be equal to the tolerance level, for consistency
                   # with the quantile definition of the tolerance
                   simul_picked = as.numeric(new_simul)
@@ -949,7 +953,7 @@
                 posterior = as.matrix(cbind(tab_weight, simul_below_tol)))
         }
         tol_next = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul))
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights))
         if (progress_bar) {
             print(paste("step ", it, " completed - R used = ", Rp, " - tol = ", tol_next, 
                 " - next R used will be ", R, sep = ""))
@@ -975,7 +979,7 @@
             }
             # check whether it is below tol_next and undo the move if it is not
             if (.compute_dist(summary_stat_target, as.numeric(new_simul[(nparam + 
-                1):(nparam + nstat)]), sd_simul) <= tol_next) {
+                1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights) <= tol_next) {
                 # we authorize the simulation to be equal to the tolerance level, for consistency
                 # with the quantile definition of the tolerance
                 simul_picked = as.numeric(new_simul)
@@ -990,14 +994,14 @@
             (nparam + 1):(nparam + nstat)]), weights = tab_weight/sum(tab_weight), 
             stats_normalization = as.numeric(sd_simul), epsilon = max(.compute_dist(summary_stat_target, 
                 as.matrix(as.matrix(simul_below_tol2)[, (nparam + 1):(nparam + nstat)]), 
-                sd_simul)), nsim = (seed_count - seed_count_ini), computime = as.numeric(difftime(Sys.time(), 
+                sd_simul, dist_weights=dist_weights)), nsim = (seed_count - seed_count_ini), computime = as.numeric(difftime(Sys.time(), 
                 start, units = "secs")), intermediary = intermediary_steps)
     } else {
         final_res = list(param = as.matrix(simul_below_tol2[, 1:nparam]), stats = as.matrix(simul_below_tol2[, 
             (nparam + 1):(nparam + nstat)]), weights = tab_weight/sum(tab_weight), 
             stats_normalization = as.numeric(sd_simul), epsilon = max(.compute_dist(summary_stat_target, 
                 as.matrix(as.matrix(simul_below_tol2)[, (nparam + 1):(nparam + nstat)]), 
-                sd_simul)), nsim = (seed_count - seed_count_ini), computime = as.numeric(difftime(Sys.time(), 
+                sd_simul, dist_weights=dist_weights)), nsim = (seed_count - seed_count_ini), computime = as.numeric(difftime(Sys.time(), 
                 start, units = "secs")))
     }
     final_res
@@ -1031,11 +1035,15 @@
 
 ## function to compute a distance between a matrix of simulated statistics and the
 ## array of data summary statistics - for M replicates simulations
-.compute_dist_M <- function(M, summary_stat_target, simul, sd_simul) {
+.compute_dist_M <- function(M, summary_stat_target, simul, sd_simul, dist_weights=NULL) {
     l = length(summary_stat_target)
     nsimul = dim(simul)[1]
     if (is.null(nsimul)) {
         nsimul = length(simul)
+    }
+    if (!is.null(dist_weights)) {
+        # TODO test if len(dist_weights)==len(summary_stat_target)
+        simul = simul * (dist_weights/sum(dist_weights))
     }
     vartab = array(1, l)
     dist = array(0, nsimul)
@@ -1112,9 +1120,9 @@
 
 ## sequential algorithm of Del Moral et al. 2012 - the proposal used is a normal
 ## in each dimension (cf paragraph 3.2 in Del Moral et al. 2012)
-.ABC_Delmoral <- function(model, prior, prior_test, nb_simul, summary_stat_target, use_seed, 
-    verbose, alpha = 0.9, M = 1, nb_threshold = floor(nb_simul/2), tolerance_target = -1, 
-    seed_count = 0, progress_bar = FALSE) {
+.ABC_Delmoral <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
+    use_seed, verbose, alpha = 0.9, M = 1, nb_threshold = floor(nb_simul/2), tolerance_target = -1, 
+    dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(alpha)) 
         stop("'alpha' has to be a number.")
@@ -1164,7 +1172,8 @@
     }
     nstat = length(summary_stat_target)
     # step 1 classic ABC step
-    simul_below_tol = .ABC_rejection_M(model, prior, prior_test, nb_simul, M, use_seed, seed_count)
+    simul_below_tol = .ABC_rejection_M(model, prior, prior_test, nb_simul, M, use_seed, 
+        seed_count)
     seed_count = seed_count + M * nb_simul
     tab_weight = rep(1/nb_simul, nb_simul)
     ESS = nb_simul
@@ -1174,10 +1183,10 @@
     l = dim(simul_below_tol)[2]
     if (M > 1) {
         particle_dist_mat = .compute_dist_M(M, summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul)
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
     } else {
         particle_dist_mat = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul)
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
     }
     dim(particle_dist_mat) <- c(nb_simul, M)
     new_tolerance = max(particle_dist_mat)
@@ -1233,10 +1242,10 @@
             particles = as.matrix(particles[uu, 1:nparam])
             if (M > 1) {
                 particle_dist_mat = .compute_dist_M(M, summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul)
+                  (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
             } else {
                 particle_dist_mat = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul)
+                  (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
             }
             dim(particle_dist_mat) <- c(nb_simul, M)
             tab_below = .compute_below(particle_dist_mat, new_tolerance)
@@ -1303,12 +1312,12 @@
                 n_acc = 1
                 if (M > 1) {
                   new_dist = .compute_dist_M(M, summary_stat_target, as.matrix(as.matrix(tab_new_simul2)[, 
-                    (nparam + 1):(nparam + nstat)]), sd_simul)
+                    (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
                   n_acc = length(new_dist[new_dist < new_tolerance])
                 } else {
                   new_dist = .compute_dist(summary_stat_target, rbind(tab_new_simul2[(nparam + 
                     1):(nparam + nstat)], tab_new_simul2[(nparam + 1):(nparam + nstat)]), 
-                    sd_simul)
+                    sd_simul, dist_weights=dist_weights)
                   if (new_dist[1] > new_tolerance) {
                     n_acc = 0
                   }
@@ -1359,10 +1368,10 @@
         }
         if (M > 1) {
             particle_dist_mat = .compute_dist_M(M, summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
         } else {
             particle_dist_mat = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
         }
         dim(particle_dist_mat) <- c(nb_simul, M)
         tab_weight = .compute_weight_delmoral(particle_dist_mat, new_tolerance)
@@ -1388,7 +1397,7 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight2/sum(tab_weight2), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")), intermediary = intermediary_steps)
     } else {
@@ -1396,7 +1405,7 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight2/sum(tab_weight2), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")))
     }
@@ -1420,14 +1429,14 @@
     l = length(prior)
     nparam = length(prior)
     random_tab = randomLHS(nb_simul, nparam)
-    lhs_index=1
+    lhs_index = 1
     for (i in 1:nb_simul) {
-        test_passed=FALSE
+        test_passed = FALSE
         while (!test_passed) {
             param = array(0, l)
             for (j in 1:l) {
                 param[j] = as.numeric(prior[[j]]$sampleArgs[2]) + (as.numeric(prior[[j]]$sampleArgs[3]) - 
-                    as.numeric(prior[[j]]$sampleArgs[2])) * random_tab[lhs_index, j]
+                  as.numeric(prior[[j]]$sampleArgs[2])) * random_tab[lhs_index, j]
             }
             test_passed = .is_in_parameter_constraints(param, prior_test)
             if (!test_passed) {
@@ -1576,9 +1585,9 @@
 }
 
 ## sequential algorithm of Lenormand et al. 2012
-.ABC_Lenormand <- function(model, prior, prior_test, nb_simul, summary_stat_target, use_seed, 
-    verbose, alpha = 0.5, p_acc_min = 0.05, seed_count = 0, inside_prior = TRUE, 
-    progress_bar = FALSE, store = FALSE) {
+.ABC_Lenormand <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
+    use_seed, verbose, alpha = 0.5, p_acc_min = 0.05, dist_weights=NULL,
+    seed_count = 0, inside_prior = TRUE, progress_bar = FALSE, store = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(alpha)) 
         stop("'alpha' has to be a number.")
@@ -1620,20 +1629,28 @@
         }
         n_alpha = ceiling(nb_simul * alpha)
         ## step 1 ABC rejection step with LHS
-        tab_ini = .ABC_rejection_lhs(model, prior, prior_test, nb_simul, use_seed, seed_count)
+        tab_ini = .ABC_rejection_lhs(model, prior, prior_test, nb_simul, use_seed, 
+            seed_count)
+        # initially, weights are equal
+        tab_weight = array(1, n_alpha)
+        if (verbose == TRUE) {
+            write.table(as.matrix(cbind(tab_weight, tab_ini)), file = "model_step1", 
+                row.names = F, col.names = F, quote = F)
+        }
         seed_count = seed_count + nb_simul
+        # determination of the normalization constants in each dimension associated to
+        # each summary statistic, this normalization will not change during all the
+        # algorithm
         sd_simul = sapply(as.data.frame(tab_ini[, (nparam + 1):(nparam + nstat)]), 
-            sd)  # determination of the normalization constants in each dimension associated to each summary statistic, this normalization will not change during all the algorithm
+            sd, na.rm = TRUE)
         # selection of the alpha quantile closest simulations
         simul_below_tol = NULL
         simul_below_tol = rbind(simul_below_tol, .selec_simul_alpha(summary_stat_target, 
             as.matrix(as.matrix(tab_ini)[, 1:nparam]), as.matrix(as.matrix(tab_ini)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul, alpha))
+                (nparam + 1):(nparam + nstat)]), sd_simul, alpha, dist_weights=dist_weights))
         simul_below_tol = simul_below_tol[1:n_alpha, ]  # to be sure that there are not two or more simulations at a distance equal to the tolerance determined by the quantile
-        # initially, weights are equal
-        tab_weight = array(1, n_alpha)
         tab_dist = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul)
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
         tol_next = max(tab_dist)
         intermediary_steps = list(NULL)
         if (verbose == TRUE) {
@@ -1673,10 +1690,14 @@
                   1:nparam])), as.matrix(as.matrix(simul_below_tol[, 1:nparam])), 
                   tab_weight/sum(tab_weight), prior))
             }
+            if (verbose == TRUE) {
+                write.table(as.matrix(cbind(tab_weight2, tab_ini)), file = paste("model_step", 
+                  it, sep = ""), row.names = F, col.names = F, quote = F)
+            }
             simul_below_tol2 = rbind(as.matrix(simul_below_tol), as.matrix(tab_ini))
             tab_weight = c(tab_weight, tab_weight2)
             tab_dist2 = .compute_dist(summary_stat_target, as.matrix(as.matrix(tab_ini)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
             p_acc = length(tab_dist2[tab_dist2 <= tol_next])/nb_simul_step
             tab_dist = c(tab_dist, tab_dist2)
             tol_next = sort(tab_dist)[n_alpha]
@@ -1684,13 +1705,17 @@
             tab_weight = tab_weight[tab_dist <= tol_next]
             tab_weight = tab_weight[1:n_alpha]
             tab_dist = tab_dist[tab_dist <= tol_next]
-            tab_dist = tab_dist[1:n_alpha]
+            odist = order(tab_dist, decreasing = FALSE)[1:n_alpha]
+            tab_dist_new = tab_dist
             simul_below_tol = matrix(0, n_alpha, (nparam + nstat))
             for (i1 in 1:n_alpha) {
+                tab_dist_new[i1] = tab_dist[odist[i1]]
                 for (i2 in 1:(nparam + nstat)) {
-                  simul_below_tol[i1, i2] = as.numeric(simul_below_tol2[i1, i2])
+                  simul_below_tol[i1, i2] = as.numeric(simul_below_tol2[odist[i1], 
+                    i2])
                 }
             }
+            tab_dist = tab_dist_new[1:n_alpha]
             if (verbose == TRUE) {
                 write.table(as.matrix(cbind(tab_weight, simul_below_tol)), file = paste("output_step", 
                   it, sep = ""), row.names = F, col.names = F, quote = F)
@@ -1714,7 +1739,7 @@
                 stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                   nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
                 epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                  (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                   seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                   units = "secs")), intermediary = intermediary_steps)
         } else {
@@ -1722,7 +1747,7 @@
                 stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                   nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
                 epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                  (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                   seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                   units = "secs")))
         }
@@ -1735,7 +1760,8 @@
         }
         n_alpha = ceiling(nb_simul * alpha)
         ## step 1 ABC rejection step with LHS
-        tab_ini = .ABC_rejection_lhs(model, prior, prior_test, nb_simul, use_seed, seed_count)
+        tab_ini = .ABC_rejection_lhs(model, prior, prior_test, nb_simul, use_seed, 
+            seed_count)
         seed_count = seed_count + nb_simul
         sd_simul = sapply(as.data.frame(tab_ini[, (nparam + 1):(nparam + nstat)]), 
             sd)  # determination of the normalization constants in each dimension associated to each summary statistic, this normalization will not change during all the algorithm
@@ -1745,12 +1771,12 @@
         simul_below_tol = NULL
         simul_below_tol = rbind(simul_below_tol, .selec_simul_alpha(summary_stat_target, 
             as.matrix(as.matrix(tab_ini)[, 1:nparam]), as.matrix(as.matrix(tab_ini)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul, alpha))
+                (nparam + 1):(nparam + nstat)]), sd_simul, alpha, dist_weights=dist_weights))
         simul_below_tol = simul_below_tol[1:n_alpha, ]  # to be sure that there are not two or more simulations at a distance equal to the tolerance determined by the quantile
         # initially, weights are equal
         tab_weight = array(1, n_alpha)
         tab_dist = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul)
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
         tol_next = max(tab_dist)
         intermediary_steps = list(NULL)
         if (verbose == TRUE) {
@@ -1795,7 +1821,7 @@
                 row.names = F, col.names = F, quote = F, append = T)
             tab_weight = c(tab_weight, tab_weight2)
             tab_dist2 = .compute_dist(summary_stat_target, as.matrix(as.matrix(tab_ini)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
             p_acc = length(tab_dist2[tab_dist2 <= tol_next])/nb_simul_step
             tab_dist = c(tab_dist, tab_dist2)
             tol_next = sort(tab_dist)[n_alpha]
@@ -1833,7 +1859,7 @@
                 stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                   nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
                 epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                  (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                   seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                   units = "secs")), intermediary = intermediary_steps)
         } else {
@@ -1841,7 +1867,7 @@
                 stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                   nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
                 epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                  (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                   seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                   units = "secs")))
         }
@@ -1849,10 +1875,266 @@
     final_res
 }
 
+## distance from a point to the design points
+.dist_compute_emulator <- function(x, design_pts) {
+    norm_design_pts = design_pts
+    norm_x = x
+    if (is.vector(design_pts)) {
+        norm_design_pts = design_pts/sd(design_pts)
+        norm_x = x/sd(design_pts)
+        dist = norm_design_pts - norm_x
+    } else {
+        nn = dim(design_pts)[2]
+        for (j in 1:nn) {
+            norm_design_pts[, j] = design_pts[, j]/sd(design_pts[, j])
+            norm_x[j] = x[j]/sd(design_pts[, j])
+        }
+        dist = apply(norm_design_pts, MARGIN = 1, function(d) {
+            sqrt(sum((d - norm_x)^2))
+        })
+    }
+    
+    dist
+}
+
+.tricubic_weight <- function(dist_array, span) {
+    maxdist = sort(dist_array)[ceiling(span * length(dist_array))]
+    w = (1 - (dist_array/maxdist)^3)^3
+    w[w < 0] = 0
+    w/sum(w)
+}
+
+.predict_locreg_deg2 <- function(x, design_pts, design_stats, span) {
+    d = .dist_compute_emulator(x, design_pts)
+    w = .tricubic_weight(d, span)
+    if (!is.vector(design_pts) && dim(design_pts)[2] > 1) {
+        centered_pts = t(apply(design_pts, MARGIN = 1, function(d) {
+            d - x
+        }))
+    } else {
+        centered_pts = design_pts - x
+    }
+    if (is.vector(centered_pts)) {
+        reg_deg2 <- as.formula(paste("design_stats ~ (centered_pts)^2"))
+    } else {
+        nparam = dim(centered_pts)[2]
+        xnam = paste0("centered_pts[,", 1:nparam)
+        reg_deg2 <- as.formula(paste("design_stats ~ (", paste(xnam, collapse = "]+"), 
+            "])^2"))
+    }
+    locreg = lm(reg_deg2, weights = w)
+    if (!is.vector(design_stats) && dim(design_stats)[2] > 1) {
+        mean_res = as.numeric(locreg$coefficients[1, ])
+        cov_res = cov.wt(locreg$residuals, wt = w)$cov
+    } else {
+        mean_res = as.numeric(locreg$coefficients[1])
+        cov_res = cov.wt(as.matrix(locreg$residuals), wt = w)$cov
+    }
+    list(mean = mean_res, covmat = cov_res)
+}
+
+.emulator_locreg_deg2 <- function(x, design_pts, design_stats, span) {
+    temp = .predict_locreg_deg2(x, design_pts, design_stats, span)
+    mvrnorm(n = 1, mu = temp$mean, Sigma = temp$covmat)
+}
+
+.ABC_sequential_emulation <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
+    use_seed, verbose, n_step_emulation = 9, emulator_span = 50, alpha = 0.5, p_acc_min = 0.05, 
+    dist_weights=NULL, seed_count = 0, inside_prior = TRUE, progress_bar = FALSE) {
+    ## checking errors in the inputs
+    if (!is.vector(alpha)) 
+        stop("'alpha' has to be a number.")
+    if (length(alpha) > 1) 
+        stop("'alpha' has to be a number.")
+    if (alpha <= 0) 
+        stop("'alpha' has to be between 0 and 1.")
+    if (alpha >= 1) 
+        stop("'alpha' has to be between 0 and 1.")
+    if (!is.vector(p_acc_min)) 
+        stop("'p_acc_min' has to be a number.")
+    if (length(p_acc_min) > 1) 
+        stop("'p_acc_min' has to be a number.")
+    if (p_acc_min <= 0) 
+        stop("'p_acc_min' has to be between 0 and 1.")
+    if (p_acc_min >= 1) 
+        stop("'p_acc_min' has to be between 0 and 1.")
+    if (!is.vector(seed_count)) 
+        stop("'seed_count' has to be a number.")
+    if (length(seed_count) > 1) 
+        stop("'seed_count' has to be a number.")
+    if (seed_count < 0) 
+        stop("'seed_count' has to be a positive number.")
+    seed_count = floor(seed_count)
+    if (!is.logical(inside_prior)) 
+        stop("'inside_prior' has to be boolean.")
+    if (!is.logical(progress_bar)) 
+        stop("'progress_bar' has to be boolean.")
+    start = Sys.time()
+    if (progress_bar) {
+        print("    ------ Jabot et al. (2015)'s algorithm ------")
+    }
+    nparam = length(prior)
+    nstat = length(summary_stat_target)
+    if (!.all_unif(prior)) {
+        stop("Prior distributions must be uniform to use the Jabot et al. (2012)'s algorithm.")
+    }
+    n_alpha = ceiling(nb_simul * alpha)
+    ## step 1 ABC rejection step with LHS
+    tab_ini = .ABC_rejection_lhs(model, prior, prior_test, nb_simul, use_seed, seed_count)
+    seed_count = seed_count + nb_simul
+    # determination of the normalization constants in each dimension associated to
+    # each summary statistic, this normalization will not change during all the
+    # algorithm
+    sd_simul = sapply(as.data.frame(tab_ini[, (nparam + 1):(nparam + nstat)]), sd)
+    tab_weight_end = array(1, nb_simul)
+    
+    print("design 1 done")
+    for (i_step_emulation in 1:n_step_emulation) {
+        
+        ## step 2 use of an emulator in a sequential ABC procedure ABC_emulator_xxx
+        ## variables are globals and are removed at the end of the function TODO avoid
+        ## global variables?
+        emulator_design_pts = tab_ini[, 1:nparam]
+        emulator_design_stats = tab_ini[, (nparam + 1):(nparam + nstat)]
+        # TODO put 50 as a parameter and add a feature for doing a cross validation
+        span = min(1, emulator_span/dim(tab_ini)[1])
+        
+        tab_dist = .compute_dist(summary_stat_target, as.matrix(tab_ini[, (nparam + 
+            1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
+        tol_max = sort(tab_dist)[nb_simul]
+        
+        res_emulator = .ABC_sequential_emulator(model, emulator_design_pts, emulator_design_stats,
+            span, tab_ini[tab_dist <= tol_max, 
+            ], tab_weight_end[tab_dist <= tol_max], nparam, nstat, sd_simul, 
+            prior, prior_test, nb_simul, summary_stat_target, use_seed, verbose, 
+            alpha, p_acc_min, dist_weights=dist_weights, seed_count, inside_prior, progress_bar)
+        print("emulation done")
+        
+        ## step 3 draw of new particles according to the result of the emulator-based fit
+        new_particles = .ABC_sequential_emulation_follow(model, res_emulator$weights, 
+            res_emulator$simul, nparam, nstat, prior, prior_test, nb_simul, summary_stat_target, 
+            use_seed, verbose, alpha, p_acc_min, seed_count, inside_prior, progress_bar)
+        tab_ini = rbind(tab_ini, new_particles$simul)
+        tab_weight_end = c(tab_weight_end, new_particles$weights)
+        print("sim new particles done")
+        
+    }
+    
+    final_res = list(param = as.matrix(as.matrix(tab_ini)[, 1:nparam]), stats = as.matrix(as.matrix(tab_ini)[, 
+        (nparam + 1):(nparam + nstat)]), weights = tab_weight_end, stats_normalization = as.numeric(sd_simul), 
+        computime = as.numeric(difftime(Sys.time(), start, units = "secs")))
+    final_res
+}
+
+
+.ABC_sequential_emulation_follow <- function(model, tab_weight, simul_below_tol, 
+    nparam, nstat, prior, prior_test, nb_simul, summary_stat_target, use_seed, verbose, 
+    alpha, p_acc_min, seed_count, inside_prior, progress_bar) {
+    
+    
+    # generate new particles with the original model
+    tab_inic = .ABC_launcher_not_uniformc(model, prior, as.matrix(as.matrix(simul_below_tol)[, 
+        1:nparam]), tab_weight/sum(tab_weight), nb_simul, use_seed, seed_count, inside_prior, 
+        progress_bar)
+    tab_ini = as.matrix(tab_inic[[1]])
+    tab_ini = as.numeric(tab_ini)
+    dim(tab_ini) = c(nb_simul, (nparam + nstat))
+    seed_count = seed_count + nb_simul
+    if (!inside_prior) {
+        tab_weight2 = .compute_weightb(as.matrix(as.matrix(tab_ini[, 1:nparam])), 
+            as.matrix(as.matrix(simul_below_tol[, 1:nparam])), tab_weight/sum(tab_weight), 
+            prior)
+    } else {
+        tab_weight2 = tab_inic[[2]] * (.compute_weightb(as.matrix(as.matrix(tab_ini[, 
+            1:nparam])), as.matrix(as.matrix(simul_below_tol[, 1:nparam])), tab_weight/sum(tab_weight), 
+            prior))
+    }
+    
+    
+    final_res = list(simul = as.matrix(as.matrix(tab_ini)), weights = tab_weight2)
+    final_res
+}
+
+
+## step 2 use of an emulator in a sequential ABC procedure
+.ABC_sequential_emulator <- function(model, emulator_design_pts, emulator_design_stats, emulator_span, tab_ini1, tab_weight1, nparam, nstat, 
+    sd_simul, prior, prior_test, nb_simul, summary_stat_target, use_seed, 
+    verbose, alpha, p_acc_min, dist_weights, seed_count, inside_prior, progress_bar) {
+    
+    n_alpha = ceiling(nb_simul * alpha)
+    
+    design_pts = tab_ini1[, 1:nparam]
+    design_stats = tab_ini1[, (nparam + 1):(nparam + nstat)]
+    
+    # initialize with the design particles
+    simul_below_tol = tab_ini1
+    tab_weight = tab_weight1
+    tab_dist = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
+        (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
+    tol_next = max(tab_dist)
+    intermediary_steps = list(NULL)
+    
+    # following steps
+    p_acc = p_acc_min + 1
+    nb_simul_step = nb_simul - n_alpha
+    it = 1
+
+    while (p_acc > p_acc_min) {
+        it = it + 1
+        simul_below_tol2 = NULL
+        if (use_seed) {
+            model_emulator = function(parameters) {
+                .emulator_locreg_deg2(parameters[2:length(parameters)], emulator_design_pts, emulator_design_stats, emulator_span)
+            }
+        } else {
+            model_emulator = function(parameters) {
+                .emulator_locreg_deg2(parameters, emulator_design_pts, emulator_design_stats, emulator_span)
+            }
+        }
+        tab_inic = .ABC_launcher_not_uniformc(model_emulator, prior, as.matrix(as.matrix(simul_below_tol)[, 
+            1:nparam]), tab_weight/sum(tab_weight), nb_simul_step, use_seed, seed_count, 
+            inside_prior, progress_bar)
+        tab_ini = as.matrix(tab_inic[[1]])
+        tab_ini = as.numeric(tab_ini)
+        dim(tab_ini) = c(nb_simul_step, (nparam + nstat))
+        seed_count = seed_count + nb_simul_step
+        if (!inside_prior) {
+            tab_weight2 = .compute_weightb(as.matrix(as.matrix(tab_ini[, 1:nparam])), 
+                as.matrix(as.matrix(simul_below_tol[, 1:nparam])), tab_weight/sum(tab_weight), 
+                prior)
+        } else {
+            tab_weight2 = tab_inic[[2]] * (.compute_weightb(as.matrix(as.matrix(tab_ini[, 
+                1:nparam])), as.matrix(as.matrix(simul_below_tol[, 1:nparam])), tab_weight/sum(tab_weight), 
+                prior))
+        }
+        simul_below_tol2 = rbind(as.matrix(simul_below_tol), as.matrix(tab_ini))
+        tab_weight = c(tab_weight, tab_weight2)
+        tab_dist2 = .compute_dist(summary_stat_target, as.matrix(as.matrix(tab_ini)[, 
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
+        p_acc = length(tab_dist2[tab_dist2 <= tol_next])/nb_simul_step
+        tab_dist = c(tab_dist, tab_dist2)
+        tol_next = sort(tab_dist)[n_alpha]
+        simul_below_tol2 = simul_below_tol2[tab_dist <= tol_next, ]
+        tab_weight = tab_weight[tab_dist <= tol_next]
+        tab_weight = tab_weight[1:n_alpha]
+        tab_dist = tab_dist[tab_dist <= tol_next]
+        tab_dist = tab_dist[1:n_alpha]
+        simul_below_tol = matrix(0, n_alpha, (nparam + nstat))
+        for (i1 in 1:n_alpha) {
+            for (i2 in 1:(nparam + nstat)) {
+                simul_below_tol[i1, i2] = as.numeric(simul_below_tol2[i1, i2])
+            }
+        }
+    }
+    final_res = list(simul = as.matrix(as.matrix(simul_below_tol)), weights = tab_weight)
+    final_res
+}
+
 ## FUNCTION ABC_sequential: Sequential ABC methods (Beaumont et al. 2009, Drovandi
-## & Pettitt 2011, Del Moral et al. 2011, Lenormand et al. 2012)
+## & Pettitt 2011, Del Moral et al. 2011, Lenormand et al. 2012, Jabot et al.
+## 2015)
 .ABC_sequential <- function(method, model, prior, prior_test, nb_simul, summary_stat_target, 
-    use_seed, verbose, ...) {
+    use_seed, verbose, dist_weights=NULL, ...) {
     options(scipen = 50)
     ## general function regrouping the different sequential algorithms [Beaumont et
     ## al., 2009] Beaumont, M. A., Cornuet, J., Marin, J., and Robert, C. P.  (2009).
@@ -1864,12 +2146,17 @@
     ## approximate Bayesian computation, Statistics and Computing., 22(5):1009-1020.
     ## [Lenormand et al. 2012] Lenormand, M., Jabot, F., Deffuant G. (2012). Adaptive
     ## approximate Bayesian computation for complex models, submitted to Comput. Stat.
-    ## )
-    return(switch(EXPR = method, Beaumont = .ABC_PMC(model, prior, prior_test, nb_simul, summary_stat_target, 
-        use_seed, verbose, ...), Drovandi = .ABC_Drovandi(model, prior, prior_test, nb_simul, 
-        summary_stat_target, use_seed, verbose, ...), Delmoral = .ABC_Delmoral(model, 
-        prior, prior_test, nb_simul, summary_stat_target, use_seed, verbose, ...), Lenormand = .ABC_Lenormand(model, 
-        prior, prior_test, nb_simul, summary_stat_target, use_seed, verbose, ...)))
+    ## [Jabot et al. 2015] Jabot, F., Lagarrigues G., Courbaud B., Dumoulin N. (2015).
+    ## A comparison of emulation methods for Approximate Bayesian Computation. To be
+    ## published.  )
+    return(switch(EXPR = method, Beaumont = .ABC_PMC(model, prior, prior_test, nb_simul, 
+        summary_stat_target, use_seed, verbose, dist_weights=dist_weights, ...), Drovandi = .ABC_Drovandi(model, 
+        prior, prior_test, nb_simul, summary_stat_target, use_seed, verbose, dist_weights=dist_weights, ...), 
+        Delmoral = .ABC_Delmoral(model, prior, prior_test, nb_simul, summary_stat_target, 
+            use_seed, verbose, dist_weights=dist_weights, ...), Lenormand = .ABC_Lenormand(model, prior, prior_test, 
+            nb_simul, summary_stat_target, use_seed, dist_weights=dist_weights, verbose, ...), Emulation = .ABC_sequential_emulation(model, 
+            prior, prior_test, nb_simul, summary_stat_target, use_seed, verbose, dist_weights=dist_weights, 
+            ...)))
     options(scipen = 0)
 }
 
@@ -1894,12 +2181,12 @@
 
 .make_proposal_range <- function(prior) {
     res = NULL
-    sample_range=array(0,100)
-    for (i in 1:length(prior)) { 
-	  for (j in 1:100){
-		sample_range[j]=prior[[i]]$sampling()
-	  }
-	  res[i]=sd(sample_range)/10
+    sample_range = array(0, 100)
+    for (i in 1:length(prior)) {
+        for (j in 1:100) {
+            sample_range[j] = prior[[i]]$sampling()
+        }
+        res[i] = sd(sample_range)/10
     }
     res
 }
@@ -1907,7 +2194,7 @@
 ## ABC-MCMC algorithm of Marjoram et al. 2003
 .ABC_MCMC <- function(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
     use_seed, verbose, dist_max = 0, tab_normalization = summary_stat_target, proposal_range = vector(mode = "numeric", 
-        length = length(prior)), seed_count = 0, progress_bar = FALSE) {
+        length = length(prior)), dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(dist_max)) 
         stop("'dist_max' has to be a number.")
@@ -1965,7 +2252,7 @@
         }
         simul_summary_stat = model(param)
         dist_simul = .compute_dist(summary_stat_target, as.numeric(simul_summary_stat), 
-            tab_normalization)
+            tab_normalization, dist_weights=dist_weights)
         dist_max = dist_simul/2
         seed_count = seed_count + 1
         print("Warning: a default value for the tolerance has been computed - it may not be appropriate to your case.")
@@ -1978,7 +2265,7 @@
         }
         simul_summary_stat = model(param)
         dist_simul = .compute_dist(summary_stat_target, as.numeric(simul_summary_stat), 
-            tab_normalization)
+            tab_normalization, dist_weights=dist_weights)
         if (dist_simul < dist_max) {
             test = TRUE
         }
@@ -2024,7 +2311,7 @@
                 param = param[2:(nparam + 1)]
             }
             dist_simul = .compute_dist(summary_stat_target, as.numeric(simul_summary_stat), 
-                tab_normalization)
+                tab_normalization, dist_weights=dist_weights)
             if (dist_simul < dist_max) {
                 param_ini = param
                 tab_simul_ini = as.numeric(simul_summary_stat)
@@ -2083,7 +2370,7 @@
 ## tolerance and proposal range following Wegmann et al. 2009
 .ABC_MCMC2 <- function(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
     use_seed, verbose, n_calibration = 10000, tolerance_quantile = 0.01, proposal_phi = 1, 
-    seed_count = 0, progress_bar = FALSE) {
+    dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(n_calibration)) 
         stop("'n_calibration' has to be a number.")
@@ -2142,7 +2429,7 @@
     for (i in 1:nstat) {
         sd_simul[i] = sd(tab_simul_summary_stat[, i])
     }
-    simuldist = .compute_dist(summary_stat_target, tab_simul_summary_stat, sd_simul)
+    simuldist = .compute_dist(summary_stat_target, tab_simul_summary_stat, sd_simul, dist_weights=dist_weights)
     ord_sim = order(simuldist, decreasing = F)
     nmax = ceiling(tolerance_quantile * n_calibration)
     dist_max = simuldist[(ord_sim[nmax])]
@@ -2192,7 +2479,7 @@
                 param = param[2:(nparam + 1)]
             }
             dist_simul = .compute_dist(summary_stat_target, as.numeric(simul_summary_stat), 
-                sd_simul)
+                sd_simul, dist_weights=dist_weights)
             if (dist_simul < dist_max) {
                 param_ini = param
                 tab_simul_ini = as.numeric(simul_summary_stat)
@@ -2252,7 +2539,7 @@
 ## are not implemented in the algorithm
 .ABC_MCMC3 <- function(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
     use_seed, verbose, n_calibration = 10000, tolerance_quantile = 0.01, proposal_phi = 1, 
-    numcomp = 0, seed_count = 0, progress_bar = FALSE) {
+    numcomp = 0, dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(n_calibration)) 
         stop("'n_calibration' has to be a number.")
@@ -2398,7 +2685,7 @@
     ## AM3 print('AM3 ')
     summary_stat_targ = t(pls_transformation %*% as.vector(summary_stat_targ))
     stat_pls = t(pls_transformation %*% t(stat))
-    simuldist = .compute_dist(summary_stat_targ, stat_pls, rep(1, numcomp))
+    simuldist = .compute_dist(summary_stat_targ, stat_pls, rep(1, numcomp), dist_weights=dist_weights)
     ## AM4 print('AM4 ')
     ord_sim = order(simuldist, decreasing = F)
     nmax = ceiling(tolerance_quantile * n_calibration)
@@ -2457,7 +2744,7 @@
             dim(simul_summary_stat) <- c(nstat, 1)
             simul_summary_stat = t(pls_transformation %*% simul_summary_stat)
             dist_simul = .compute_dist(summary_stat_targ, as.numeric(simul_summary_stat), 
-                rep(1, numcomp))
+                rep(1, numcomp), dist_weights=dist_weights)
             ## AM8-9 print('AM8-9 ')
             if (dist_simul < dist_max) {
                 param_ini = param
@@ -2517,14 +2804,15 @@
 
 ## FUNCTION ABC_mcmc: ABC coupled to MCMC (Marjoram et al. 2003, Wegmann et al.
 ## 2009)
-.ABC_mcmc_internal <- function(method, model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
-    use_seed, verbose, ...) {
+.ABC_mcmc_internal <- function(method, model, prior, prior_test, n_obs, n_between_sampling, 
+    summary_stat_target, use_seed, verbose, dist_weights=NULL, ...) {
     options(scipen = 50)
-    return(switch(EXPR = method, Marjoram_original = .ABC_MCMC(model, prior, prior_test, n_obs, 
-        n_between_sampling, summary_stat_target, use_seed, verbose, ...), Marjoram = .ABC_MCMC2(model, 
-        prior, prior_test, n_obs, n_between_sampling, summary_stat_target, use_seed, verbose, 
-        , ...), Wegmann = .ABC_MCMC3(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
-        use_seed, verbose, ...)))
+    return(switch(EXPR = method, Marjoram_original = .ABC_MCMC(model, prior, prior_test, 
+        n_obs, n_between_sampling, summary_stat_target, use_seed, verbose, dist_weights=dist_weights, ...), 
+        Marjoram = .ABC_MCMC2(model, prior, prior_test, n_obs, n_between_sampling, 
+            summary_stat_target, use_seed, verbose, dist_weights=dist_weights, ...), Wegmann = .ABC_MCMC3(model, 
+            prior, prior_test, n_obs, n_between_sampling, summary_stat_target, use_seed, 
+            verbose, dist_weights=dist_weights, ...)))
     options(scipen = 0)
 }
 
@@ -2578,8 +2866,8 @@
 }
 
 ## FUNCTION ABC_rejection: brute-force ABC (Pritchard et al. 1999)
-.ABC_rejection_cluster <- function(model, prior, prior_test, nb_simul, seed_count = 0, n_cluster = 1, 
-    verbose) {
+.ABC_rejection_cluster <- function(model, prior, prior_test, nb_simul, seed_count = 0, 
+    n_cluster = 1, verbose) {
     if (verbose) {
         write.table(NULL, file = "output", row.names = F, col.names = F, quote = F)
     }
@@ -2698,7 +2986,7 @@
                 list_param[[i]] = param
                 tab_param = rbind(tab_param, param[2:(l + 1)])
             }
-            seed_count = seed_count + n_cluster
+            seed_count = seed_count + 100 * n_cluster
             list_simul_summarystat = parLapplyLB(cl, list_param, model)
             for (i in 1:(100 * n_cluster)) {
                 tab_simul_summarystat = rbind(tab_simul_summarystat, as.numeric(list_simul_summarystat[[i]]))
@@ -2803,7 +3091,7 @@
                 list_param[[i]] = param
                 tab_param = rbind(tab_param, param[2:(l + 1)])
             }
-            seed_count = seed_count + n_cluster
+            seed_count = seed_count + 100 * n_cluster
             list_simul_summarystat = parLapplyLB(cl, list_param, model)
             for (i in 1:(100 * n_cluster)) {
                 tab_simul_summarystat = rbind(tab_simul_summarystat, as.numeric(list_simul_summarystat[[i]]))
@@ -2855,8 +3143,9 @@
 }
 
 ## PMC ABC algorithm: Beaumont et al. Biometrika 2009
-.ABC_PMC_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, n_cluster, 
-    verbose, seed_count = 0, inside_prior = TRUE, tolerance_tab = -1, progress_bar = FALSE) {
+.ABC_PMC_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
+    n_cluster, verbose, dist_weights=NULL, seed_count = 0, inside_prior = TRUE, tolerance_tab = -1, 
+    progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(seed_count)) 
         stop("'seed_count' has to be a number.")
@@ -2902,7 +3191,7 @@
             # selection of simulations below the first tolerance level
             simul_below_tol = rbind(simul_below_tol, .selec_simul(summary_stat_target, 
                 as.matrix(as.matrix(tab_ini)[, 1:nparam]), as.matrix(as.matrix(tab_ini)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul, tolerance_tab[1]))
+                  (nparam + 1):(nparam + nstat)]), sd_simul, tolerance_tab[1], dist_weights=dist_weights))
             if (length(simul_below_tol) > 0) {
                 nb_simul_step = nb_simul - dim(simul_below_tol)[1]
             }
@@ -2911,7 +3200,7 @@
                 seed_count, n_cluster)
             seed_count = seed_count + nb_simul_step
             if (.compute_dist(summary_stat_target, tab_ini[(nparam + 1):(nparam + 
-                nstat)], sd_simul) < tolerance_tab[1]) {
+                nstat)], sd_simul, dist_weights=dist_weights) < tolerance_tab[1]) {
                 simul_below_tol = rbind(simul_below_tol, tab_ini)
                 nb_simul_step = 0
             }
@@ -2944,7 +3233,7 @@
                 seed_count = seed_count + nb_simul_step
                 simul_below_tol2 = rbind(simul_below_tol2, .selec_simul(summary_stat_target, 
                   as.matrix(as.matrix(tab_ini)[, 1:nparam]), as.matrix(as.matrix(tab_ini)[, 
-                    (nparam + 1):(nparam + nstat)]), sd_simul, tolerance_tab[it]))
+                    (nparam + 1):(nparam + nstat)]), sd_simul, tolerance_tab[it], dist_weights=dist_weights))
                 if (length(simul_below_tol2) > 0) {
                   nb_simul_step = nb_simul - dim(simul_below_tol2)[1]
                 }
@@ -2954,7 +3243,7 @@
                   n_cluster)
                 seed_count = seed_count + nb_simul_step
                 if (.compute_dist(summary_stat_target, tab_ini[(nparam + 1):(nparam + 
-                  nstat)], sd_simul) < tolerance_tab[it]) {
+                  nstat)], sd_simul, dist_weights=dist_weights) < tolerance_tab[it]) {
                   simul_below_tol2 = rbind(simul_below_tol2, tab_ini)
                   nb_simul_step = 0
                 }
@@ -2991,7 +3280,7 @@
             stats = as.matrix(as.matrix(as.matrix(simul_below_tol))[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")), intermediary = intermediary_steps)
     } else {
@@ -2999,7 +3288,7 @@
             stats = as.matrix(as.matrix(as.matrix(simul_below_tol))[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")))
     }
@@ -3007,7 +3296,7 @@
 }
 
 .move_drovandi_ini_cluster <- function(nb_simul_step, simul_below_tol, tab_weight, 
-    nparam, nstat, prior, summary_stat_target, tol_next, seed_count, n_cluster, model, 
+    nparam, nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, model, 
     sd_simul) {
     i_acc = 0
     res = NULL
@@ -3040,7 +3329,7 @@
                 # check whether it is below tol_next and undo the move if it is not
                 new_simul = c(as.numeric(tab_param[i, ]), as.numeric(list_simul_summarystat[[i]]))
                 if (.compute_dist(summary_stat_target, as.numeric(new_simul[(nparam + 
-                  1):(nparam + nstat)]), sd_simul) <= tol_next) {
+                  1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights) <= tol_next) {
                   # we authorize the simulation to be equal to the tolerance level, for consistency
                   # with the quantile definition of the tolerance
                   tab_picked[i, ] = as.numeric(new_simul)
@@ -3075,7 +3364,7 @@
             # check whether it is below tol_next and undo the move if it is not
             new_simul = c(as.numeric(tab_param[i, ]), as.numeric(list_simul_summarystat[[i]]))
             if (.compute_dist(summary_stat_target, as.numeric(new_simul[(nparam + 
-                1):(nparam + nstat)]), sd_simul) <= tol_next) {
+                1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights) <= tol_next) {
                 # we authorize the simulation to be equal to the tolerance level, for consistency
                 # with the quantile definition of the tolerance
                 tab_picked[i, ] = as.numeric(new_simul)
@@ -3091,7 +3380,7 @@
 }
 
 .move_drovandi_end_cluster <- function(nb_simul_step, new_particles, nparam, nstat, 
-    prior, summary_stat_target, tol_next, seed_count, n_cluster, model, sd_simul) {
+    prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, model, sd_simul) {
     i_acc = 0
     res = NULL
     npar = floor(nb_simul_step/(100 * n_cluster))
@@ -3116,14 +3405,14 @@
                 list_param[[i]] = param
                 tab_picked = rbind(tab_picked, as.numeric(simul_picked))
             }
-            seed_count = seed_count + n_cluster
+            seed_count = seed_count + 100 * n_cluster
             # perform simulations
             list_simul_summarystat = parLapplyLB(cl, list_param, model)
             for (i in 1:(100 * n_cluster)) {
                 # check whether it is below tol_next and undo the move if it is not
                 new_simul = c(as.numeric(tab_param[i, ]), as.numeric(list_simul_summarystat[[i]]))
                 if (.compute_dist(summary_stat_target, as.numeric(new_simul[(nparam + 
-                  1):(nparam + nstat)]), sd_simul) <= tol_next) {
+                  1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights) <= tol_next) {
                   # we authorize the simulation to be equal to the tolerance level, for consistency
                   # with the quantile definition of the tolerance
                   tab_picked[i, ] = as.numeric(new_simul)
@@ -3158,7 +3447,7 @@
             # check whether it is below tol_next and undo the move if it is not
             new_simul = c(as.numeric(tab_param[i, ]), as.numeric(list_simul_summarystat[[i]]))
             if (.compute_dist(summary_stat_target, as.numeric(new_simul[(nparam + 
-                1):(nparam + nstat)]), sd_simul) <= tol_next) {
+                1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights) <= tol_next) {
                 # we authorize the simulation to be equal to the tolerance level, for consistency
                 # with the quantile definition of the tolerance
                 tab_picked[i, ] = as.numeric(new_simul)
@@ -3174,7 +3463,7 @@
 }
 
 .move_drovandi_diversify_cluster <- function(nb_simul_step, new_particles, nparam, 
-    nstat, prior, summary_stat_target, tol_next, seed_count, n_cluster, model, sd_simul) {
+    nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, model, sd_simul) {
     i_acc = 0
     res = NULL
     npar = floor(nb_simul_step/(100 * n_cluster))
@@ -3199,14 +3488,14 @@
                 list_param[[i]] = param
                 tab_picked = rbind(tab_picked, as.numeric(simul_picked))
             }
-            seed_count = seed_count + n_cluster
+            seed_count = seed_count + 100 * n_cluster
             # perform simulations
             list_simul_summarystat = parLapplyLB(cl, list_param, model)
             for (i in 1:(100 * n_cluster)) {
                 # check whether it is below tol_next and undo the move if it is not
                 new_simul = c(as.numeric(tab_param[i, ]), as.numeric(list_simul_summarystat[[i]]))
                 if (.compute_dist(summary_stat_target, as.numeric(new_simul[(nparam + 
-                  1):(nparam + nstat)]), sd_simul) <= tol_next) {
+                  1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights) <= tol_next) {
                   # we authorize the simulation to be equal to the tolerance level, for consistency
                   # with the quantile definition of the tolerance
                   tab_picked[i, ] = as.numeric(new_simul)
@@ -3241,7 +3530,7 @@
             # check whether it is below tol_next and undo the move if it is not
             new_simul = c(as.numeric(tab_param[i, ]), as.numeric(list_simul_summarystat[[i]]))
             if (.compute_dist(summary_stat_target, as.numeric(new_simul[(nparam + 
-                1):(nparam + nstat)]), sd_simul) <= tol_next) {
+                1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights) <= tol_next) {
                 # we authorize the simulation to be equal to the tolerance level, for consistency
                 # with the quantile definition of the tolerance
                 tab_picked[i, ] = as.numeric(new_simul)
@@ -3258,9 +3547,9 @@
 
 ## sequential algorithm of Drovandi & Pettitt 2011 - the proposal used is a
 ## multivariate normal (cf paragraph 2.2 - p. 227 in Drovandi & Pettitt 2011)
-.ABC_Drovandi_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, n_cluster, 
-    verbose, seed_count = 0, tolerance_tab = -1, alpha = 0.5, c = 0.01, first_tolerance_level_auto = TRUE, 
-    progress_bar = FALSE) {
+.ABC_Drovandi_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
+    n_cluster, verbose, dist_weights=NULL, seed_count = 0, tolerance_tab = -1, alpha = 0.5, c = 0.01, 
+    first_tolerance_level_auto = TRUE, progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(seed_count)) 
         stop("'seed_count' has to be a number.")
@@ -3311,23 +3600,23 @@
     simul_below_tol = NULL
     if (first_tolerance_level_auto) {
         # classic ABC step
-        tab_ini = .ABC_rejection_internal_cluster(model, prior, prior_test, nb_simul_step, seed_count, 
-            n_cluster)
+        tab_ini = .ABC_rejection_internal_cluster(model, prior, prior_test, nb_simul_step, 
+            seed_count, n_cluster)
         sd_simul = sapply(as.data.frame(tab_ini[, (nparam + 1):(nparam + nstat)]), 
             sd)  # determination of the normalization constants in each dimension associated to each summary statistic, this normalization will not change during all the algorithm
         seed_count = seed_count + nb_simul_step
         # selection of simulations below the first tolerance level
         simul_below_tol = rbind(simul_below_tol, .selec_simul_alpha(summary_stat_target, 
             as.matrix(as.matrix(tab_ini)[, 1:nparam]), as.matrix(as.matrix(tab_ini)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul, (1 - alpha)))
+                (nparam + 1):(nparam + nstat)]), sd_simul, (1 - alpha), dist_weights=dist_weights))
         simul_below_tol = simul_below_tol[1:nb_simul, ]  # to be sure that there are not two or more simulations at a distance equal to the tolerance determined by the quantile
     } else {
         nb_simul_step = nb_simul
         while (nb_simul_step > 0) {
             if (nb_simul_step > 1) {
                 # classic ABC step
-                tab_ini = .ABC_rejection_internal_cluster(model, prior, prior_test, nb_simul_step, 
-                  seed_count, n_cluster)
+                tab_ini = .ABC_rejection_internal_cluster(model, prior, prior_test, 
+                  nb_simul_step, seed_count, n_cluster)
                 if (nb_simul_step == nb_simul) {
                   sd_simul = sapply(as.data.frame(tab_ini[, (nparam + 1):(nparam + 
                     nstat)]), sd)  # determination of the normalization constants in each dimension associated to each summary statistic, this normalization will not change during all the algorithm
@@ -3336,16 +3625,16 @@
                 # selection of simulations below the first tolerance level
                 simul_below_tol = rbind(simul_below_tol, .selec_simulb(summary_stat_target, 
                   as.matrix(as.matrix(tab_ini)[, 1:nparam]), as.matrix(as.matrix(tab_ini)[, 
-                    (nparam + 1):(nparam + nstat)]), sd_simul, tolerance_tab[1]))  # we authorize the simulation to be equal to the tolerance level, for consistency with the quantile definition of the tolerance
+                    (nparam + 1):(nparam + nstat)]), sd_simul, tolerance_tab[1], dist_weights=dist_weights))  # we authorize the simulation to be equal to the tolerance level, for consistency with the quantile definition of the tolerance
                 if (length(simul_below_tol) > 0) {
                   nb_simul_step = nb_simul - dim(simul_below_tol)[1]
                 }
             } else {
-                tab_ini = .ABC_rejection_internal_cluster(model, prior, prior_test, nb_simul_step, 
-                  seed_count, n_cluster)
+                tab_ini = .ABC_rejection_internal_cluster(model, prior, prior_test, 
+                  nb_simul_step, seed_count, n_cluster)
                 seed_count = seed_count + nb_simul_step
                 if (.compute_dist(summary_stat_target, tab_ini[(nparam + 1):(nparam + 
-                  nstat)], sd_simul) <= tolerance_tab[1]) {
+                  nstat)], sd_simul, dist_weights=dist_weights) <= tolerance_tab[1]) {
                   simul_below_tol = rbind(simul_below_tol, tab_ini)
                   nb_simul_step = 0
                 }
@@ -3370,7 +3659,7 @@
     tol_next = tolerance_tab[1]
     if (first_tolerance_level_auto) {
         tol_next = max(.compute_dist(summary_stat_target, simul_below_tol[, (nparam + 
-            1):(nparam + nstat)], sd_simul))
+            1):(nparam + nstat)], sd_simul, dist_weights=dist_weights))
     }
     R = 1
     l = dim(simul_below_tol)[2]
@@ -3381,11 +3670,11 @@
         nb_simul_step = n_alpha
         # compute epsilon_next
         tol_next = sort(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul))[(nb_simul - n_alpha)]
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights))[(nb_simul - n_alpha)]
         # drop the n_alpha poorest particles
         simul_below_tol2 = .selec_simulb(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
             1:nparam]), as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
-            nstat)]), sd_simul, tol_next)  # we authorize the simulation to be equal to the tolerance level, for consistency with the quantile definition of the tolerance
+            nstat)]), sd_simul, tol_next, dist_weights=dist_weights)  # we authorize the simulation to be equal to the tolerance level, for consistency with the quantile definition of the tolerance
         simul_below_tol = matrix(0, (nb_simul - n_alpha), (nparam + nstat))
         for (i1 in 1:(nb_simul - n_alpha)) {
             for (i2 in 1:(nparam + nstat)) {
@@ -3393,7 +3682,7 @@
             }
         }
         md = .move_drovandi_ini_cluster(nb_simul_step, simul_below_tol, tab_weight[1:(nb_simul - 
-            n_alpha)], nparam, nstat, prior, summary_stat_target, tol_next, seed_count, 
+            n_alpha)], nparam, nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, 
             n_cluster, model, sd_simul)
         new_particles = md[[1]]
         i_acc = i_acc + md[[2]]
@@ -3401,7 +3690,7 @@
         if (R > 1) {
             for (j in 2:R) {
                 md = .move_drovandi_end_cluster(nb_simul_step, new_particles, nparam, 
-                  nstat, prior, summary_stat_target, tol_next, seed_count, n_cluster, 
+                  nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, 
                   model, sd_simul)
                 new_particles = md[[1]]
                 i_acc = i_acc + md[[2]]
@@ -3442,7 +3731,7 @@
                 posterior = as.matrix(cbind(tab_weight, simul_below_tol)))
         }
         tol_next = max(.compute_dist(summary_stat_target, simul_below_tol[, (nparam + 
-            1):(nparam + nstat)], sd_simul))
+            1):(nparam + nstat)], sd_simul, dist_weights=dist_weights))
         if (progress_bar) {
             print(paste("step ", it, " completed - R used = ", Rp, " - tol = ", tol_next, 
                 " - next R used will be ", R, sep = ""))
@@ -3452,7 +3741,7 @@
     simul_below_tol2 = NULL
     for (j in 1:R) {
         simul_below_tol = .move_drovandi_diversify_cluster(nb_simul, simul_below_tol, 
-            nparam, nstat, prior, summary_stat_target, tol_next, seed_count, n_cluster, 
+            nparam, nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, 
             model, sd_simul)
         seed_count = seed_count + nb_simul
     }
@@ -3462,7 +3751,7 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")), intermediary = intermediary_steps)
     } else {
@@ -3470,7 +3759,7 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")))
     }
@@ -3478,7 +3767,8 @@
 }
 
 ## rejection algorithm with M simulations per parameter set
-.ABC_rejection_M_cluster <- function(model, prior, prior_test, nb_simul, M, seed_count, n_cluster) {
+.ABC_rejection_M_cluster <- function(model, prior, prior_test, nb_simul, M, seed_count, 
+    n_cluster) {
     tab_simul_summarystat = NULL
     tab_param = NULL
     list_param = list(NULL)
@@ -3534,9 +3824,9 @@
 
 ## sequential algorithm of Del Moral et al. 2012 - the proposal used is a normal
 ## in each dimension (cf paragraph 3.2 in Del Moral et al. 2012)
-.ABC_Delmoral_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, n_cluster, 
-    verbose, alpha = 0.9, M = 1, nb_threshold = floor(nb_simul/2), tolerance_target = -1, 
-    seed_count = 0, progress_bar = FALSE) {
+.ABC_Delmoral_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
+    n_cluster, verbose, alpha = 0.9, M = 1, nb_threshold = floor(nb_simul/2), tolerance_target = -1, 
+    dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(alpha)) 
         stop("'alpha' has to be a number.")
@@ -3581,8 +3871,8 @@
     nparam = length(prior)
     nstat = length(summary_stat_target)
     # step 1 classic ABC step
-    simul_below_tol = .ABC_rejection_M_cluster(model, prior, prior_test, nb_simul, M, seed_count, 
-        n_cluster)
+    simul_below_tol = .ABC_rejection_M_cluster(model, prior, prior_test, nb_simul, 
+        M, seed_count, n_cluster)
     seed_count = seed_count + M * nb_simul
     tab_weight = rep(1/nb_simul, nb_simul)
     ESS = nb_simul
@@ -3592,10 +3882,10 @@
     l = dim(simul_below_tol)[2]
     if (M > 1) {
         particle_dist_mat = .compute_dist_M(M, summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul)
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
     } else {
         particle_dist_mat = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul)
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
     }
     dim(particle_dist_mat) <- c(nb_simul, M)
     new_tolerance = max(particle_dist_mat)
@@ -3653,10 +3943,10 @@
             particles = as.matrix(particles[uu, 1:nparam])
             if (M > 1) {
                 particle_dist_mat = .compute_dist_M(M, summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul)
+                  (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
             } else {
                 particle_dist_mat = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                  (nparam + 1):(nparam + nstat)]), sd_simul)
+                  (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
             }
             dim(particle_dist_mat) <- c(nb_simul, M)
             tab_below = .compute_below(particle_dist_mat, new_tolerance)
@@ -3758,12 +4048,12 @@
                 n_acc = 1
                 if (M > 1) {
                   new_dist = .compute_dist_M(M, summary_stat_target, tab_new_simul2[(((iii - 
-                    1) * M + 1):(iii * M)), (nparam + 1):(nparam + nstat)], sd_simul)
+                    1) * M + 1):(iii * M)), (nparam + 1):(nparam + nstat)], sd_simul, dist_weights=dist_weights)
                   n_acc = length(new_dist[new_dist < new_tolerance])
                 } else {
                   new_dist = .compute_dist(summary_stat_target, rbind(tab_new_simul2[iii, 
                     (nparam + 1):(nparam + nstat)], tab_new_simul2[iii, (nparam + 
-                    1):(nparam + nstat)]), sd_simul)
+                    1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
                   if (new_dist[1] > new_tolerance) {
                     n_acc = 0
                   }
@@ -3796,10 +4086,10 @@
         }
         if (M > 1) {
             particle_dist_mat = .compute_dist_M(M, summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
         } else {
             particle_dist_mat = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
         }
         dim(particle_dist_mat) <- c(nb_simul, M)
         tab_weight = .compute_weight_delmoral(particle_dist_mat, new_tolerance)
@@ -3824,7 +4114,7 @@
         (nparam + 1):(nparam + nstat)]), weights = tab_weight2/sum(tab_weight2), 
         stats_normalization = as.numeric(sd_simul), epsilon = max(.compute_dist(summary_stat_target, 
             as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + nstat)]), 
-            sd_simul)), nsim = (seed_count - seed_count_ini), computime = as.numeric(difftime(Sys.time(), 
+            sd_simul, dist_weights=dist_weights)), nsim = (seed_count - seed_count_ini), computime = as.numeric(difftime(Sys.time(), 
             start, units = "secs")))
     final_res = NULL
     if (verbose == TRUE) {
@@ -3832,7 +4122,7 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight2/sum(tab_weight2), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")), intermediary = intermediary_steps)
     } else {
@@ -3840,7 +4130,7 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight2/sum(tab_weight2), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")))
     }
@@ -3848,7 +4138,8 @@
 }
 
 ## function to sample in the prior distributions using a Latin Hypercube sample
-.ABC_rejection_lhs_cluster <- function(model, prior, prior_test, nb_simul, seed_count, n_cluster) {
+.ABC_rejection_lhs_cluster <- function(model, prior, prior_test, nb_simul, seed_count, 
+    n_cluster) {
     # library(lhs)
     cl <- makeCluster(getOption("cl.cores", n_cluster))
     tab_simul_summarystat = NULL
@@ -3872,8 +4163,8 @@
                 } else {
                   for (j in 1:l) {
                     param[j] = as.numeric(prior[[j]]$sampleArgs[2]) + (as.numeric(prior[[j]]$sampleArgs[3]) - 
-                      as.numeric(prior[[j]]$sampleArgs[2])) * random_tab[((irun - 1) * 
-                      100 * n_cluster + i), j]
+                      as.numeric(prior[[j]]$sampleArgs[2])) * random_tab[((irun - 
+                      1) * 100 * n_cluster + i), j]
                   }
                 }
                 # if (use_seed) # NB: we force the value use_seed=TRUE
@@ -3881,7 +4172,7 @@
                 list_param[[i]] = param
                 tab_param = rbind(tab_param, param[2:(l + 1)])
             }
-            seed_count = seed_count + n_cluster
+            seed_count = seed_count + (n_cluster * 100)
             list_simul_summarystat = parLapplyLB(cl, list_param, model)
             for (i in 1:(100 * n_cluster)) {
                 tab_simul_summarystat = rbind(tab_simul_summarystat, as.numeric(list_simul_summarystat[[i]]))
@@ -3898,8 +4189,8 @@
             } else {
                 for (j in 1:l) {
                   param[j] = as.numeric(prior[[j]]$sampleArgs[2]) + (as.numeric(prior[[j]]$sampleArgs[3]) - 
-                    as.numeric(prior[[j]]$sampleArgs[2])) * random_tab[(npar * 100 * n_cluster + 
-                    i), j]
+                    as.numeric(prior[[j]]$sampleArgs[2])) * random_tab[(npar * 100 * 
+                    n_cluster + i), j]
                 }
             }
             # if (use_seed) # NB: we force the value use_seed=TRUE
@@ -3967,7 +4258,7 @@
                 list_param[[i]] = param
                 tab_param = rbind(tab_param, param[2:(l + 1)])
             }
-            seed_count = seed_count + n_cluster
+            seed_count = seed_count + n_cluster * 100
             list_simul_summarystat = parLapplyLB(cl, list_param, model)
             for (i in 1:(100 * n_cluster)) {
                 tab_simul_summarystat = rbind(tab_simul_summarystat, as.numeric(list_simul_summarystat[[i]]))
@@ -4075,7 +4366,7 @@
                 list_param[[i]] = param
                 tab_param = rbind(tab_param, param[2:(l + 1)])
             }
-            seed_count = seed_count + n_cluster
+            seed_count = seed_count + 100 * n_cluster
             list_simul_summarystat = parLapplyLB(cl, list_param, model)
             for (i in 1:(100 * n_cluster)) {
                 tab_simul_summarystat = rbind(tab_simul_summarystat, as.numeric(list_simul_summarystat[[i]]))
@@ -4129,8 +4420,8 @@
 }
 
 ## sequential algorithm of Lenormand et al. 2012
-.ABC_Lenormand_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, n_cluster, 
-    verbose, alpha = 0.5, p_acc_min = 0.05, seed_count = 0, inside_prior = TRUE, 
+.ABC_Lenormand_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
+    n_cluster, verbose, alpha = 0.5, p_acc_min = 0.05, dist_weights=NULL, seed_count = 0, inside_prior = TRUE, 
     progress_bar = FALSE) {
     ## checking errors in the inputs
     if (!is.vector(alpha)) 
@@ -4170,19 +4461,31 @@
     }
     n_alpha = ceiling(nb_simul * alpha)
     ## step 1 ABC rejection step with LHS
-    tab_ini = .ABC_rejection_lhs_cluster(model, prior, prior_test, nb_simul, seed_count, n_cluster)
+    tab_ini = .ABC_rejection_lhs_cluster(model, prior, prior_test, nb_simul, seed_count, 
+        n_cluster)
+    # initially, weights are equal
+    tab_weight = array(1, n_alpha)
+    if (verbose == TRUE) {
+        write.table(as.matrix(cbind(tab_weight, tab_ini)), file = "model_step1", 
+            row.names = F, col.names = F, quote = F)
+    }
     seed_count = seed_count + nb_simul
-    sd_simul = sapply(as.data.frame(tab_ini[, (nparam + 1):(nparam + nstat)]), sd)  # determination of the normalization constants in each dimension associated to each summary statistic, this normalization will not change during all the algorithm
+    # determination of the normalization constants in each dimension associated to
+    # each summary statistic, this normalization will not change during all the
+    # algorithm
+    sd_simul = sapply(as.data.frame(tab_ini[, (nparam + 1):(nparam + nstat)]), sd, 
+        na.rm = TRUE)
     # selection of the alpha quantile closest simulations
     simul_below_tol = NULL
     simul_below_tol = rbind(simul_below_tol, .selec_simul_alpha(summary_stat_target, 
         tab_ini[, 1:nparam], tab_ini[, (nparam + 1):(nparam + nstat)], sd_simul, 
-        alpha))
+        alpha, dist_weights=dist_weights))
     simul_below_tol = simul_below_tol[1:n_alpha, ]  # to be sure that there are not two or more simulations at a distance equal to the tolerance determined by the quantile
-    # initially, weights are equal
-    tab_weight = array(1, n_alpha)
     tab_dist = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-        (nparam + 1):(nparam + nstat)]), sd_simul)
+        (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
+    if (!is.null(dist_weights)) {
+        tab_dist = tab_dist * (dist_weights/sum(dist_weights))
+    }
     tol_next = max(tab_dist)
     intermediary_steps = list(NULL)
     if (verbose == TRUE) {
@@ -4222,24 +4525,36 @@
                 1:nparam])), as.matrix(as.matrix(as.matrix(simul_below_tol)[, 1:nparam])), 
                 tab_weight/sum(tab_weight), prior))
         }
+        if (verbose == TRUE) {
+            write.table(as.matrix(cbind(tab_weight2, tab_ini)), file = paste("model_step", 
+                it, sep = ""), row.names = F, col.names = F, quote = F)
+        }
         simul_below_tol2 = rbind(as.matrix(simul_below_tol), as.matrix(tab_ini))
         tab_weight = c(tab_weight, tab_weight2)
         tab_dist2 = .compute_dist(summary_stat_target, as.matrix(as.matrix(tab_ini)[, 
-            (nparam + 1):(nparam + nstat)]), sd_simul)
-        p_acc = length(tab_dist2[tab_dist2 <= tol_next])/nb_simul_step
+            (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
+        if (!is.null(dist_weights)) {
+            tab_dist2 = tab_dist2 * (dist_weights/sum(dist_weights))
+        }
+        p_acc = length(tab_dist2[!is.na(tab_dist2) & tab_dist2 <= tol_next])/nb_simul_step
         tab_dist = c(tab_dist, tab_dist2)
         tol_next = sort(tab_dist)[n_alpha]
-        simul_below_tol2 = simul_below_tol2[tab_dist <= tol_next, ]
-        tab_weight = tab_weight[tab_dist <= tol_next]
+        simul_below_tol2 = simul_below_tol2[!is.na(tab_dist) & tab_dist <= tol_next, 
+            ]
+        tab_weight = tab_weight[!is.na(tab_dist) & tab_dist <= tol_next]
         tab_weight = tab_weight[1:n_alpha]
-        tab_dist = tab_dist[tab_dist <= tol_next]
-        tab_dist = tab_dist[1:n_alpha]
+        tab_dist = tab_dist[!is.na(tab_dist) & tab_dist <= tol_next]
+        odist = order(tab_dist, decreasing = FALSE)[1:n_alpha]
+        tab_dist_new = tab_dist
         simul_below_tol = matrix(0, n_alpha, (nparam + nstat))
         for (i1 in 1:n_alpha) {
+            tab_dist_new[i1] = tab_dist[odist[i1]]
             for (i2 in 1:(nparam + nstat)) {
-                simul_below_tol[i1, i2] = as.numeric(simul_below_tol2[i1, i2])
+                simul_below_tol[i1, i2] = as.numeric(simul_below_tol2[odist[i1], 
+                  i2])
             }
         }
+        tab_dist = tab_dist_new[1:n_alpha]
         if (verbose == TRUE) {
             write.table(as.matrix(cbind(tab_weight, simul_below_tol)), file = paste("output_step", 
                 it, sep = ""), row.names = F, col.names = F, quote = F)
@@ -4263,7 +4578,7 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")), intermediary = intermediary_steps)
     } else {
@@ -4271,43 +4586,44 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")))
     }
     final_res
 }
 
-## general function regrouping the different sequential
-## algorithms [Beaumont et al., 2009] Beaumont, M. A., Cornuet, J., Marin, J., and
-## Robert, C. P.  (2009). Adaptive approximate Bayesian computation.
-## Biometrika,96(4):983-990.  [Drovandi & Pettitt 2011] Drovandi, C. C. and
-## Pettitt, A. N. (2011).  Estimation of parameters for macroparasite population
-## evolution using approximate Bayesian computation. Biometrics, 67(1):225-233.
-## [Del Moral et al. 2012] Del Moral, P., Doucet, A., and Jasra, A. (2012). An
-## adaptive sequential Monte Carlo method for approximate Bayesian computation,
-## Statistics and Computing., 22(5):1009-1020.  [Lenormand et al. 2012] Lenormand,
-## M., Jabot, F., Deffuant G. (2012). Adaptive approximate Bayesian computation
-## for complex models, submitted to Comput. Stat. )
+## general function regrouping the different sequential algorithms [Beaumont et
+## al., 2009] Beaumont, M. A., Cornuet, J., Marin, J., and Robert, C. P.  (2009).
+## Adaptive approximate Bayesian computation.  Biometrika,96(4):983-990.
+## [Drovandi & Pettitt 2011] Drovandi, C. C. and Pettitt, A. N. (2011).
+## Estimation of parameters for macroparasite population evolution using
+## approximate Bayesian computation. Biometrics, 67(1):225-233.  [Del Moral et al.
+## 2012] Del Moral, P., Doucet, A., and Jasra, A. (2012). An adaptive sequential
+## Monte Carlo method for approximate Bayesian computation, Statistics and
+## Computing., 22(5):1009-1020.  [Lenormand et al. 2012] Lenormand, M., Jabot, F.,
+## Deffuant G. (2012). Adaptive approximate Bayesian computation for complex
+## models, submitted to Comput. Stat. )
 .ABC_sequential_cluster <- function(method, model, prior, prior_test, nb_simul, summary_stat_target, 
-    n_cluster, use_seed, verbose, ...) {
+    n_cluster, use_seed, verbose, dist_weights=NULL, ...) {
     if (use_seed == FALSE) {
         stop("For parallel implementations, you must specify the option 'use_seed=TRUE' and modify your model accordingly - see the package's vignette for more details.")
     }
     options(scipen = 50)
-    return(switch(EXPR = method, Beaumont = .ABC_PMC_cluster(model, prior, prior_test, nb_simul, 
-        summary_stat_target, n_cluster, verbose, , ...), Drovandi = .ABC_Drovandi_cluster(model, 
-        prior, nb_simul, summary_stat_target, n_cluster, verbose, ...), Delmoral = .ABC_Delmoral_cluster(model, 
-        prior, prior_test, nb_simul, summary_stat_target, n_cluster, verbose, ...), Lenormand = .ABC_Lenormand_cluster(model, 
-        prior, prior_test, nb_simul, summary_stat_target, n_cluster, verbose, ...)))
+    return(switch(EXPR = method, Beaumont = .ABC_PMC_cluster(model, prior, prior_test, 
+        nb_simul, summary_stat_target, n_cluster, verbose, dist_weights=dist_weights , ...), Drovandi = .ABC_Drovandi_cluster(model, 
+        prior, nb_simul, summary_stat_target, n_cluster, verbose, dist_weights=dist_weights, ...), Delmoral = .ABC_Delmoral_cluster(model, 
+        prior, prior_test, nb_simul, summary_stat_target, n_cluster, verbose, dist_weights=dist_weights, ...), 
+        Lenormand = .ABC_Lenormand_cluster(model, prior, prior_test, nb_simul, summary_stat_target, 
+            n_cluster, verbose, dist_weights=dist_weights, ...)))
     options(scipen = 0)
 }
 
 ## ABC-MCMC algorithm of Marjoram et al. 2003 with automatic determination of the
 ## tolerance and proposal range following Wegmann et al. 2009
-.ABC_MCMC2_cluster <- function(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
-    n_cluster, verbose, n_calibration = 10000, tolerance_quantile = 0.01, proposal_phi = 1, 
-    seed_count = 0) {
+.ABC_MCMC2_cluster <- function(model, prior, prior_test, n_obs, n_between_sampling, 
+    summary_stat_target, n_cluster, verbose, n_calibration = 10000, tolerance_quantile = 0.01, 
+    proposal_phi = 1, dist_weights=NULL, seed_count = 0) {
     ## checking errors in the inputs
     if (!is.vector(n_calibration)) 
         stop("'n_calibration' has to be a number.")
@@ -4347,8 +4663,8 @@
     tab_simul_summary_stat = NULL
     tab_param = NULL
     # initial draw of a particle
-    initial = .ABC_rejection_internal_cluster(model, prior, prior_test, n_calibration, seed_count, 
-        n_cluster)
+    initial = .ABC_rejection_internal_cluster(model, prior, prior_test, n_calibration, 
+        seed_count, n_cluster)
     seed_count = seed_count + n_calibration
     tab_param = as.matrix(as.matrix(initial)[, 1:nparam])
     tab_simul_summary_stat = as.matrix(initial[, (nparam + 1):(nparam + nstat)])
@@ -4356,7 +4672,7 @@
     for (i in 1:nstat) {
         sd_simul[i] = sd(tab_simul_summary_stat[, i])
     }
-    simuldist = .compute_dist(summary_stat_target, tab_simul_summary_stat, sd_simul)
+    simuldist = .compute_dist(summary_stat_target, tab_simul_summary_stat, sd_simul, dist_weights=dist_weights)
     ord_sim = order(simuldist, decreasing = F)
     nmax = ceiling(tolerance_quantile * n_calibration)
     dist_max = simuldist[(ord_sim[nmax])]
@@ -4391,7 +4707,7 @@
             simul_summary_stat = model(param)
             param = param[2:(nparam + 1)]
             dist_simul = .compute_dist(summary_stat_target, as.numeric(simul_summary_stat), 
-                sd_simul)
+                sd_simul, dist_weights=dist_weights)
             if (dist_simul < dist_max) {
                 param_ini = param
                 tab_simul_ini = as.numeric(simul_summary_stat)
@@ -4435,9 +4751,9 @@
 ## ABC-MCMC algorithm of Wegmann et al. 2009 - the PLS step is drawn from the
 ## manual of ABCtoolbox (figure 9) - NB: for consistency with ABCtoolbox, AM11-12
 ## are not implemented in the algorithm
-.ABC_MCMC3_cluster <- function(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
-    n_cluster, verbose, n_calibration = 10000, tolerance_quantile = 0.01, proposal_phi = 1, 
-    numcomp = 0, seed_count = 0) {
+.ABC_MCMC3_cluster <- function(model, prior, prior_test, n_obs, n_between_sampling, 
+    summary_stat_target, n_cluster, verbose, n_calibration = 10000, tolerance_quantile = 0.01, 
+    proposal_phi = 1, numcomp = 0, dist_weights=NULL, seed_count = 0) {
     ## checking errors in the inputs
     if (!is.vector(n_calibration)) 
         stop("'n_calibration' has to be a number.")
@@ -4569,7 +4885,7 @@
     ## AM3 print('AM3 ')
     summary_stat_targ = t(pls_transformation %*% as.vector(summary_stat_targ))
     stat_pls = t(pls_transformation %*% t(stat))
-    simuldist = .compute_dist(summary_stat_targ, stat_pls, rep(1, numcomp))
+    simuldist = .compute_dist(summary_stat_targ, stat_pls, rep(1, numcomp), dist_weights=dist_weights)
     ## AM4 print('AM4 ')
     ord_sim = order(simuldist, decreasing = F)
     nmax = ceiling(tolerance_quantile * n_calibration)
@@ -4617,7 +4933,7 @@
             dim(simul_summary_stat) <- c(nstat, 1)
             simul_summary_stat = t(pls_transformation %*% simul_summary_stat)
             dist_simul = .compute_dist(summary_stat_targ, as.numeric(simul_summary_stat), 
-                rep(1, numcomp))
+                rep(1, numcomp), dist_weights=dist_weights)
             ## AM8-9 print('AM8-9 ')
             if (dist_simul < dist_max) {
                 param_ini = param
@@ -4663,18 +4979,18 @@
 
 ## FUNCTION ABC_mcmc: ABC coupled to MCMC (Marjoram et al. 2003, Wegmann et al.
 ## 2009)
-.ABC_mcmc_cluster <- function(method, model, prior, prior_test, n_obs, n_between_sampling,
-    summary_stat_target, n_cluster = 1, use_seed, verbose, ...) {
+.ABC_mcmc_cluster <- function(method, model, prior, prior_test, n_obs, n_between_sampling, 
+    summary_stat_target, n_cluster = 1, use_seed, verbose, dist_weights=NULL, ...) {
     if (use_seed == FALSE) {
         stop("For parallel implementations, you must specify the option 'use_seed=TRUE' and modify your model accordingly - see the package's vignette for more details.")
     }
     options(scipen = 50)
     # library(parallel) Note that we do not consider the original Marjoram's
     # algortithm, which is not prone to parallel computing. (no calibration step)
-    return(switch(EXPR = method, Marjoram = .ABC_MCMC2_cluster(model, prior, prior_test, n_obs, 
-        n_between_sampling, summary_stat_target, n_cluster, verbose, ...), Wegmann = .ABC_MCMC3_cluster(model, 
-        prior, prior_test, n_obs, n_between_sampling, summary_stat_target, n_cluster, verbose, 
-        ...)))
+    return(switch(EXPR = method, Marjoram = .ABC_MCMC2_cluster(model, prior, prior_test, 
+        n_obs, n_between_sampling, summary_stat_target, n_cluster, verbose, dist_weights=dist_weights, ...), 
+        Wegmann = .ABC_MCMC3_cluster(model, prior, prior_test, n_obs, n_between_sampling, 
+            summary_stat_target, n_cluster, verbose, dist_weights=dist_weights, ...)))
     options(scipen = 0)
 }
 

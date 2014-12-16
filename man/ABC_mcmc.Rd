@@ -8,7 +8,8 @@
 }
 \usage{
 	ABC_mcmc(method, model, prior, summary_stat_target, prior_test=NULL, n_rec=100,
-	n_between_sampling=10,	n_cluster = 1, use_seed = FALSE, verbose = FALSE, ...)
+	n_between_sampling=10,	n_cluster = 1, use_seed = FALSE, verbose = FALSE,
+	dist_weights=NULL, ...)
 }
 \arguments{
   \item{method}{
@@ -40,6 +41,11 @@
   \item{verbose}{
     logical. \code{FALSE} by default. If \code{TRUE}, \code{ABC_mcmc} writes in the current directory intermediary results at the end of each step of the algorithm in the file "output_mcmc".
     These outputs have a matrix format, in wich each raw is a different simulation, the first columns are the parameters used for this simulation, the following columns are the summary statistics of this simulation, and the last column is the distance between the simulation and the data.}
+  \item{dist_weights}{
+    a vector containing the weights to apply to the distance between the computed and the targeted statistics.
+    These weights can be used to give more importance to a summary statistisc for example. The weights will
+    be normalized before applying them. If not provided, no weights will be applied.
+  }
   \item{\dots}{Additional arguments can be passed depending on the choosen method (see below)}
 }
 
@@ -128,7 +134,7 @@
 }
 \author{Franck Jabot, Thierry Faure and Nicolas Dumoulin}
 \seealso{
-  \code{\link{binary_model}}, \code{\link{binary_model_cluster}}, \code{\link{ABC_rejection}}, \code{\link{ABC_sequential}}
+  \code{\link{binary_model}}, \code{\link{binary_model_cluster}}, \code{\link{ABC_rejection}}, \code{\link{ABC_emulation}}, \code{\link{ABC_sequential}}
 }
 \examples{
  \dontrun{ 
