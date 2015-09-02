@@ -179,16 +179,16 @@
 }
 
 ## function to move a particle
-.move_particleb <- function(param_picked, varcov_matrix, prior) {
+.move_particleb <- function(param_picked, varcov_matrix, prior, max_pick=10000) {
     # with package mnormt library(mnormt)
     test = FALSE
     counter = 0
-    while ((!test) && (counter < 100)) {
+    while ((!test) && (counter < max_pick)) {
         counter = counter + 1
         res = rmnorm(n = 1, mean = param_picked, varcov_matrix)
         test = .is_included(res, prior)
     }
-    if (counter == 100) {
+    if (counter == max_pick) {
         stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
     }
     res
@@ -341,18 +341,18 @@
 }
 
 ## function to move a particle with a unidimensional normal jump
-.move_particleb_uni <- function(param_picked, sd_array, prior) {
+.move_particleb_uni <- function(param_picked, sd_array, prior, max_pick=10000) {
     test = FALSE
     res = param_picked
     counter = 0
-    while ((!test) && (counter < 100)) {
+    while ((!test) && (counter < max_pick)) {
         counter = counter + 1
         for (i in 1:length(param_picked)) {
             res[i] = rnorm(n = 1, mean = param_picked[i], sd_array[i])
         }
         test = .is_included(res, prior)
     }
-    if (counter == 100) {
+    if (counter == max_pick) {
         stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
     }
     res
@@ -403,7 +403,7 @@
 ## function to perform ABC simulations from a non-uniform prior and with
 ## unidimensional jumps
 .ABC_launcher_not_uniform_uni <- function(model, prior, param_previous_step, tab_weight, 
-    nb_simul, use_seed, seed_count, inside_prior) {
+    nb_simul, use_seed, seed_count, inside_prior, max_pick=10000) {
     tab_simul_summarystat = NULL
     tab_param = NULL
     l = dim(param_previous_step)[2]
@@ -440,7 +440,7 @@
         } else {
             test = FALSE
             counter = 0
-            while ((!test) && (counter < 100)) {
+            while ((!test) && (counter < max_pick)) {
                 counter = counter + 1
                 # pick a particle
                 if (lp == 0) {
@@ -457,7 +457,7 @@
                   test = .is_included(param_moved, prior)
                 }
             }
-            if (counter == 100) {
+            if (counter == max_pick) {
                 stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
             }
         }
@@ -500,7 +500,7 @@
 
 ## PMC ABC algorithm: Beaumont et al. Biometrika 2009
 .ABC_PMC <- function(model, prior, prior_test, nb_simul, summary_stat_target, use_seed, 
-    verbose, dist_weights=NULL, seed_count = 0, inside_prior = TRUE, tolerance_tab = -1, progress_bar = FALSE) {
+    verbose, dist_weights=NULL, seed_count = 0, inside_prior = TRUE, tolerance_tab = -1, progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(seed_count)) 
         stop("'seed_count' has to be a number.")
@@ -586,7 +586,7 @@
             if (nb_simul_step > 1) {
                 # Sampling of parameters around the previous particles
                 tab_ini = .ABC_launcher_not_uniform_uni(model, prior, as.matrix(simul_below_tol[, 
-                  1:nparam]), tab_weight, nb_simul_step, use_seed, seed_count, inside_prior)
+                  1:nparam]), tab_weight, nb_simul_step, use_seed, seed_count, inside_prior, max_pick)
                 seed_count = seed_count + nb_simul_step
                 simul_below_tol2 = rbind(simul_below_tol2, .selec_simul(summary_stat_target, 
                   tab_ini[, 1:nparam], tab_ini[, (nparam + 1):(nparam + nstat)], 
@@ -596,7 +596,7 @@
                 }
             } else {
                 tab_ini = .ABC_launcher_not_uniform_uni(model, prior, as.matrix(simul_below_tol[, 
-                  1:nparam]), tab_weight, nb_simul_step, use_seed, seed_count, inside_prior)
+                  1:nparam]), tab_weight, nb_simul_step, use_seed, seed_count, inside_prior, max_pick)
                 seed_count = seed_count + nb_simul_step
                 if (.compute_dist(summary_stat_target, tab_ini[(nparam + 1):(nparam + 
                   nstat)], sd_simul, dist_weights=dist_weights) < tolerance_tab[it]) {
@@ -720,7 +720,7 @@
 ## multivariate normal (cf paragraph 2.2 - p. 227 in Drovandi & Pettitt 2011)
 .ABC_Drovandi <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
     use_seed, verbose, tolerance_tab = -1, alpha = 0.5, c = 0.01, first_tolerance_level_auto = TRUE, 
-    dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
+    dist_weights=NULL, seed_count = 0, progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(tolerance_tab)) 
         stop("'tolerance_tab' has to be a vector.")
@@ -878,7 +878,7 @@
             for (j in 1:R) {
                 # move it
                 param_moved = .move_particleb(simul_picked[1:nparam], 2 * var(as.matrix(as.matrix(simul_below_tol[, 
-                  1:nparam]))), prior)
+                  1:nparam]))), prior, max_pick)
                 param = simul_picked[1:nparam]
                 param = param_moved
                 if (use_seed) {
@@ -966,7 +966,7 @@
         for (j in 1:R) {
             # move it
             param_moved = .move_particleb(simul_picked[1:nparam], 2 * var(as.matrix(as.matrix(simul_below_tol[, 
-                1:nparam]))), prior)
+                1:nparam]))), prior, max_pick)
             param = simul_picked[1:nparam]
             param = param_moved
             if (use_seed) {
@@ -1055,7 +1055,7 @@
         }
     } else {
         vartab = min(1, 1/(sd_simul * sd_simul))  ## differences between simul and data are normalized in each dimension by the empirical variances in each dimension
-        dist = dist + vartab * (simul - summary_stat_target[i]) * (simul - summary_stat_target[i])  ## an euclidean distance is used
+        dist = dist + vartab * (simul[, 1] - summary_stat_target) * (simul[, 1] - summary_stat_target)  ## an euclidean distance is used
     }
     distb = matrix(0, nsimul/M, M)
     for (i in 1:(nsimul/M)) {
@@ -1083,8 +1083,12 @@
     for (i in 1:n_particle) {
         new_weight[i] = length(particle_dist_mat[i, ][particle_dist_mat[i, ] < tolerance])
     }
-    new_weight = new_weight/sum(new_weight)
-    1/(sum(new_weight * new_weight))
+    if (sum(new_weight)==0){
+      return(0)
+    } else {
+      new_weight = new_weight/sum(new_weight)
+      1/(sum(new_weight * new_weight))
+    }
 }
 
 ## function to compute the number of simul below a new tolerance value
@@ -1122,7 +1126,7 @@
 ## in each dimension (cf paragraph 3.2 in Del Moral et al. 2012)
 .ABC_Delmoral <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
     use_seed, verbose, alpha = 0.9, M = 1, nb_threshold = floor(nb_simul/2), tolerance_target = -1, 
-    dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
+    dist_weights=NULL, seed_count = 0, progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(alpha)) 
         stop("'alpha' has to be a number.")
@@ -1239,7 +1243,7 @@
                   simul_below_tol[i1, i2] = as.numeric(particles[i1, i2])
                 }
             }
-            particles = as.matrix(particles[uu, 1:nparam])
+            particles = as.matrix(particles[, 1:nparam])
             if (M > 1) {
                 particle_dist_mat = .compute_dist_M(M, summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
                   (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
@@ -1279,7 +1283,7 @@
                 tab_new_simul = NULL
                 # move it
                 param_moved = .move_particleb_uni(as.numeric(particles[(i * M), ]), 
-                  sd_array, prior)
+                  sd_array, prior, max_pick)
                 param = particles[(i * M), ]
                 param = param_moved
                 if (use_seed) {
@@ -1461,8 +1465,7 @@
 }
 
 ## function to compute particle weights without normalizing to 1
-.compute_weightb <- function(param_simulated, param_previous_step, tab_weight2, prior) {
-    tab_weight = tab_weight2/sum(tab_weight2)
+.compute_weightb <- function(param_simulated, param_previous_step, tab_weight, prior) {
     vmat = as.matrix(2 * cov.wt(as.matrix(param_previous_step), as.vector(tab_weight))$cov)
     n_particle = dim(param_previous_step)[1]
     n_new_particle = dim(param_simulated)[1]
@@ -1515,7 +1518,7 @@
 ## function to perform ABC simulations from a non-uniform prior (derived from a
 ## set of particles)
 .ABC_launcher_not_uniformc <- function(model, prior, param_previous_step, tab_weight, 
-    nb_simul, use_seed, seed_count, inside_prior, progress_bar) {
+    nb_simul, use_seed, seed_count, inside_prior, progress_bar, max_pick=10000) {
     tab_simul_summarystat = NULL
     tab_param = NULL
     k_acc = 0
@@ -1537,7 +1540,7 @@
         } else {
             test = FALSE
             counter = 0
-            while ((!test) && (counter < 100)) {
+            while ((!test) && (counter < max_pick)) {
                 counter = counter + 1
                 k_acc = k_acc + 1
                 # pick a particle
@@ -1547,7 +1550,7 @@
                   as.vector(tab_weight))$cov)  # only variable parameters are moved, computation of a WEIGHTED variance
                 test = .is_included(param_moved, prior)
             }
-            if (counter == 100) {
+            if (counter == max_pick) {
                 stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
             }
         }
@@ -1587,7 +1590,7 @@
 ## sequential algorithm of Lenormand et al. 2012
 .ABC_Lenormand <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
     use_seed, verbose, alpha = 0.5, p_acc_min = 0.05, dist_weights=NULL,
-    seed_count = 0, inside_prior = TRUE, progress_bar = FALSE, store = FALSE) {
+    seed_count = 0, inside_prior = TRUE, progress_bar = FALSE, store = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(alpha)) 
         stop("'alpha' has to be a number.")
@@ -1676,7 +1679,7 @@
             simul_below_tol2 = NULL
             tab_inic = .ABC_launcher_not_uniformc(model, prior, as.matrix(as.matrix(simul_below_tol)[, 
                 1:nparam]), tab_weight/sum(tab_weight), nb_simul_step, use_seed, 
-                seed_count, inside_prior, progress_bar)
+                seed_count, inside_prior, progress_bar, max_pick)
             tab_ini = as.matrix(tab_inic[[1]])
             tab_ini = as.numeric(tab_ini)
             dim(tab_ini) = c(nb_simul_step, (nparam + nstat))
@@ -1992,8 +1995,7 @@
     for (i_step_emulation in 1:n_step_emulation) {
         
         ## step 2 use of an emulator in a sequential ABC procedure ABC_emulator_xxx
-        ## variables are globals and are removed at the end of the function TODO avoid
-        ## global variables?
+        ## variables are globals and are removed at the end of the function
         emulator_design_pts = tab_ini[, 1:nparam]
         emulator_design_stats = tab_ini[, (nparam + 1):(nparam + nstat)]
         # TODO put 50 as a parameter and add a feature for doing a cross validation
@@ -2161,11 +2163,11 @@
 }
 
 ## function to move a particle with a unidimensional uniform jump
-.move_particle_uni_uniform <- function(param_picked, sd_array, prior) {
+.move_particle_uni_uniform <- function(param_picked, sd_array, prior, max_pick=10000) {
     test = FALSE
     res = param_picked
     counter = 0
-    while ((!test) && (counter < 100)) {
+    while ((!test) && (counter < max_pick)) {
         counter = counter + 1
         for (i in 1:length(param_picked)) {
             res[i] = runif(n = 1, min = param_picked[i] - sd_array[i], max = param_picked[i] + 
@@ -2173,7 +2175,7 @@
         }
         test = .is_included(res, prior)
     }
-    if (counter == 100) {
+    if (counter == max_pick) {
         stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
     }
     res
@@ -2194,7 +2196,7 @@
 ## ABC-MCMC algorithm of Marjoram et al. 2003
 .ABC_MCMC <- function(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
     use_seed, verbose, dist_max = 0, tab_normalization = summary_stat_target, proposal_range = vector(mode = "numeric", 
-        length = length(prior)), dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
+        length = length(prior)), dist_weights=NULL, seed_count = 0, progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(dist_max)) 
         stop("'dist_max' has to be a number.")
@@ -2302,7 +2304,7 @@
     for (is in 2:n_obs) {
         for (i in 1:n_between_sampling) {
             param = .move_particle_uni_uniform(as.numeric(param_ini), proposal_range, 
-                prior)
+                prior, max_pick)
             if (use_seed) {
                 param = c(seed_count, param)
             }
@@ -2370,7 +2372,7 @@
 ## tolerance and proposal range following Wegmann et al. 2009
 .ABC_MCMC2 <- function(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
     use_seed, verbose, n_calibration = 10000, tolerance_quantile = 0.01, proposal_phi = 1, 
-    dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
+    dist_weights=NULL, seed_count = 0, progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(n_calibration)) 
         stop("'n_calibration' has to be a number.")
@@ -2470,7 +2472,7 @@
     for (is in 2:n_obs) {
         for (i in 1:n_between_sampling) {
             param = .move_particle_uni_uniform(as.numeric(param_ini), proposal_range, 
-                prior)
+                prior, max_pick)
             if (use_seed) {
                 param = c(seed_count, param)
             }
@@ -2539,7 +2541,7 @@
 ## are not implemented in the algorithm
 .ABC_MCMC3 <- function(model, prior, prior_test, n_obs, n_between_sampling, summary_stat_target, 
     use_seed, verbose, n_calibration = 10000, tolerance_quantile = 0.01, proposal_phi = 1, 
-    numcomp = 0, dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
+    numcomp = 0, dist_weights=NULL, seed_count = 0, progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(n_calibration)) 
         stop("'n_calibration' has to be a number.")
@@ -2721,7 +2723,7 @@
         for (i in 1:n_between_sampling) {
             ## AM6 print('AM6 ')
             param = .move_particle_uni_uniform(as.numeric(param_ini), proposal_range, 
-                prior)
+                prior, max_pick)
             if (use_seed) {
                 param = c(seed_count, param)
             }
@@ -2945,7 +2947,7 @@
 ## function to perform ABC simulations from a non-uniform prior (derived from a
 ## set of particles)
 .ABC_launcher_not_uniform_cluster <- function(model, prior, param_previous_step, 
-    tab_weight, nb_simul, seed_count, inside_prior, n_cluster) {
+    tab_weight, nb_simul, seed_count, inside_prior, n_cluster, max_pick=10000) {
     tab_simul_summarystat = NULL
     tab_param = NULL
     cl <- makeCluster(getOption("cl.cores", n_cluster))
@@ -2966,7 +2968,7 @@
                 } else {
                   test = FALSE
                   counter = 0
-                  while ((!test) && (counter < 100)) {
+                  while ((!test) && (counter < max_pick)) {
                     counter = counter + 1
                     # pick a particle
                     param_picked = .particle_pick(as.matrix(as.matrix(param_previous_step)), 
@@ -2976,7 +2978,7 @@
                       as.vector(tab_weight))$cov)  # only variable parameters are moved, computation of a WEIGHTED variance
                     test = .is_included(param_moved, prior)
                   }
-                  if (counter == 100) {
+                  if (counter == max_pick) {
                     stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
                   }
                 }
@@ -3008,7 +3010,7 @@
             } else {
                 test = FALSE
                 counter = 0
-                while ((!test) && (counter < 100)) {
+                while ((!test) && (counter < max_pick)) {
                   counter = counter + 1
                   # pick a particle
                   param_picked = .particle_pick(as.matrix(as.matrix(param_previous_step)), 
@@ -3018,7 +3020,7 @@
                     as.vector(tab_weight))$cov)  # only variable parameters are moved, computation of a WEIGHTED variance
                   test = .is_included(param_moved, prior)
                 }
-                if (counter == 100) {
+                if (counter == max_pick) {
                   stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
                 }
             }
@@ -3043,7 +3045,7 @@
 ## function to perform ABC simulations from a non-uniform prior and with
 ## unidimensional jumps
 .ABC_launcher_not_uniform_uni_cluster <- function(model, prior, param_previous_step, 
-    tab_weight, nb_simul, seed_count, inside_prior, n_cluster) {
+    tab_weight, nb_simul, seed_count, inside_prior, n_cluster, max_pick=10000) {
     tab_simul_summarystat = NULL
     tab_param = NULL
     cl <- makeCluster(getOption("cl.cores", n_cluster))
@@ -3072,7 +3074,7 @@
                 } else {
                   test = FALSE
                   counter = 0
-                  while ((!test) && (counter < 100)) {
+                  while ((!test) && (counter < max_pick)) {
                     counter = counter + 1
                     # pick a particle
                     param_picked = .particle_pick(as.matrix(as.matrix(param_previous_step)), 
@@ -3081,7 +3083,7 @@
                     param_moved = .move_particle_uni(as.numeric(param_picked), sd_array)  # only variable parameters are moved
                     test = .is_included(param_moved, prior)
                   }
-                  if (counter == 100) {
+                  if (counter == max_pick) {
                     stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
                   }
                 }
@@ -3111,7 +3113,7 @@
             } else {
                 test = FALSE
                 counter = 0
-                while ((!test) && (counter < 100)) {
+                while ((!test) && (counter < max_pick)) {
                   counter = counter + 1
                   # pick a particle
                   param_picked = .particle_pick(as.matrix(as.matrix(param_previous_step)), 
@@ -3120,7 +3122,7 @@
                   param_moved = .move_particle_uni(as.numeric(param_picked), sd_array)  # only variable parameters are moved
                   test = .is_included(param_moved, prior)
                 }
-                if (counter == 100) {
+                if (counter == max_pick) {
                   stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
                 }
             }
@@ -3145,7 +3147,7 @@
 ## PMC ABC algorithm: Beaumont et al. Biometrika 2009
 .ABC_PMC_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
     n_cluster, verbose, dist_weights=NULL, seed_count = 0, inside_prior = TRUE, tolerance_tab = -1, 
-    progress_bar = FALSE) {
+    progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(seed_count)) 
         stop("'seed_count' has to be a number.")
@@ -3229,7 +3231,7 @@
                 # Sampling of parameters around the previous particles
                 tab_ini = .ABC_launcher_not_uniform_uni_cluster(model, prior, as.matrix(as.matrix(simul_below_tol)[, 
                   1:nparam]), tab_weight, nb_simul_step, seed_count, inside_prior, 
-                  n_cluster)
+                  n_cluster, max_pick)
                 seed_count = seed_count + nb_simul_step
                 simul_below_tol2 = rbind(simul_below_tol2, .selec_simul(summary_stat_target, 
                   as.matrix(as.matrix(tab_ini)[, 1:nparam]), as.matrix(as.matrix(tab_ini)[, 
@@ -3240,7 +3242,7 @@
             } else {
                 tab_ini = .ABC_launcher_not_uniform_uni_cluster(model, prior, as.matrix(as.matrix(simul_below_tol)[, 
                   1:nparam]), tab_weight, nb_simul_step, seed_count, inside_prior, 
-                  n_cluster)
+                  n_cluster, max_pick)
                 seed_count = seed_count + nb_simul_step
                 if (.compute_dist(summary_stat_target, tab_ini[(nparam + 1):(nparam + 
                   nstat)], sd_simul, dist_weights=dist_weights) < tolerance_tab[it]) {
@@ -3297,7 +3299,7 @@
 
 .move_drovandi_ini_cluster <- function(nb_simul_step, simul_below_tol, tab_weight, 
     nparam, nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, model, 
-    sd_simul) {
+    sd_simul, max_pick=10000) {
     i_acc = 0
     res = NULL
     npar = floor(nb_simul_step/(100 * n_cluster))
@@ -3314,7 +3316,7 @@
                 simul_picked = .particle_pick(simul_below_tol, tab_weight)
                 # move it
                 param_moved = .move_particleb(simul_picked[1:nparam], 2 * var(as.matrix(as.matrix(as.matrix(simul_below_tol)[, 
-                  1:nparam]))), prior)
+                  1:nparam]))), prior, max_pick)
                 param = simul_picked[1:nparam]
                 param = param_moved
                 param = c((seed_count + i), param)
@@ -3349,7 +3351,7 @@
             simul_picked = .particle_pick(simul_below_tol, tab_weight)
             # move it
             param_moved = .move_particleb(simul_picked[1:nparam], 2 * var(as.matrix(as.matrix(as.matrix(simul_below_tol)[, 
-                1:nparam]))), prior)
+                1:nparam]))), prior, max_pick)
             param = simul_picked[1:nparam]
             param = param_moved
             param = c((seed_count + i), param)
@@ -3380,7 +3382,7 @@
 }
 
 .move_drovandi_end_cluster <- function(nb_simul_step, new_particles, nparam, nstat, 
-    prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, model, sd_simul) {
+    prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, model, sd_simul, max_pick=10000) {
     i_acc = 0
     res = NULL
     npar = floor(nb_simul_step/(100 * n_cluster))
@@ -3397,7 +3399,7 @@
                 simul_picked = new_particles[((irun - 1) * n_cluster + i), ]
                 # move it
                 param_moved = .move_particleb(simul_picked[1:nparam], 2 * var(as.matrix(as.matrix(as.matrix(new_particles)[, 
-                  1:nparam]))), prior)
+                  1:nparam]))), prior, max_pick)
                 param = simul_picked[1:nparam]
                 param = param_moved
                 param = c((seed_count + i), param)
@@ -3432,7 +3434,7 @@
             simul_picked = new_particles[(npar * n_cluster + i), ]
             # move it
             param_moved = .move_particleb(simul_picked[1:nparam], 2 * var(as.matrix(as.matrix(as.matrix(new_particles)[, 
-                1:nparam]))), prior)
+                1:nparam]))), prior, max_pick)
             param = simul_picked[1:nparam]
             param = param_moved
             param = c((seed_count + i), param)
@@ -3463,7 +3465,7 @@
 }
 
 .move_drovandi_diversify_cluster <- function(nb_simul_step, new_particles, nparam, 
-    nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, model, sd_simul) {
+    nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, model, sd_simul, max_pick=10000) {
     i_acc = 0
     res = NULL
     npar = floor(nb_simul_step/(100 * n_cluster))
@@ -3480,7 +3482,7 @@
                 simul_picked = new_particles[((irun - 1) * n_cluster + i), ]
                 # move it
                 param_moved = .move_particleb(simul_picked[1:nparam], 2 * var(as.matrix(as.matrix(as.matrix(new_particles)[, 
-                  1:nparam]))), prior)
+                  1:nparam]))), prior, max_pick)
                 param = simul_picked[1:nparam]
                 param = param_moved
                 param = c((seed_count + i), param)
@@ -3515,7 +3517,7 @@
             simul_picked = new_particles[(npar * n_cluster + i), ]
             # move it
             param_moved = .move_particleb(simul_picked[1:nparam], 2 * var(as.matrix(as.matrix(as.matrix(new_particles)[, 
-                1:nparam]))), prior)
+                1:nparam]))), prior, max_pick)
             param = simul_picked[1:nparam]
             param = param_moved
             param = c((seed_count + i), param)
@@ -3549,7 +3551,7 @@
 ## multivariate normal (cf paragraph 2.2 - p. 227 in Drovandi & Pettitt 2011)
 .ABC_Drovandi_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
     n_cluster, verbose, dist_weights=NULL, seed_count = 0, tolerance_tab = -1, alpha = 0.5, c = 0.01, 
-    first_tolerance_level_auto = TRUE, progress_bar = FALSE) {
+    first_tolerance_level_auto = TRUE, progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(seed_count)) 
         stop("'seed_count' has to be a number.")
@@ -3683,7 +3685,7 @@
         }
         md = .move_drovandi_ini_cluster(nb_simul_step, simul_below_tol, tab_weight[1:(nb_simul - 
             n_alpha)], nparam, nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, 
-            n_cluster, model, sd_simul)
+            n_cluster, model, sd_simul, max_pick)
         new_particles = md[[1]]
         i_acc = i_acc + md[[2]]
         seed_count = seed_count + nb_simul_step
@@ -3691,7 +3693,7 @@
             for (j in 2:R) {
                 md = .move_drovandi_end_cluster(nb_simul_step, new_particles, nparam, 
                   nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, 
-                  model, sd_simul)
+                  model, sd_simul, max_pick)
                 new_particles = md[[1]]
                 i_acc = i_acc + md[[2]]
                 seed_count = seed_count + nb_simul_step
@@ -3742,7 +3744,7 @@
     for (j in 1:R) {
         simul_below_tol = .move_drovandi_diversify_cluster(nb_simul, simul_below_tol, 
             nparam, nstat, prior, summary_stat_target, tol_next, dist_weights, seed_count, n_cluster, 
-            model, sd_simul)
+            model, sd_simul, max_pick)
         seed_count = seed_count + nb_simul
     }
     final_res = NULL
@@ -3826,7 +3828,7 @@
 ## in each dimension (cf paragraph 3.2 in Del Moral et al. 2012)
 .ABC_Delmoral_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
     n_cluster, verbose, alpha = 0.9, M = 1, nb_threshold = floor(nb_simul/2), tolerance_target = -1, 
-    dist_weights=NULL, seed_count = 0, progress_bar = FALSE) {
+    dist_weights=NULL, seed_count = 0, progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(alpha)) 
         stop("'alpha' has to be a number.")
@@ -3984,7 +3986,7 @@
                   if (tab_weight[ii2] > 0) {
                     if ((ii == 1) || (M == 1)) {
                       param_moved = .move_particleb_uni(as.numeric(particles[(ii2 * 
-                        M), ]), sd_array, prior)
+                        M), ]), sd_array, prior, max_pick)
                       param = particles[(ii2 * M), ]
                       param = param_moved
                       param2 = c((seed_count + 1), param)
@@ -4014,7 +4016,7 @@
                 if (tab_weight[ii2] > 0) {
                   if ((ii == 1) || (M == 1)) {
                     param_moved = .move_particleb_uni(as.numeric(particles[(ii2 * 
-                      M), ]), sd_array, prior)
+                      M), ]), sd_array, prior, max_pick)
                     param = particles[(ii2 * M), ]
                     param = param_moved
                     param2 = c((seed_count + 1), param)
@@ -4210,11 +4212,11 @@
     options(scipen = 0)
     cbind(tab_param, tab_simul_summarystat)
 }
-
+         
 ## function to perform ABC simulations from a non-uniform prior (derived from a
 ## set of particles)
 .ABC_launcher_not_uniformc_cluster <- function(model, prior, param_previous_step, 
-    tab_weight, nb_simul, seed_count, inside_prior, n_cluster) {
+    tab_weight, nb_simul, seed_count, inside_prior, n_cluster, max_pick=10000) {
     tab_simul_summarystat = NULL
     tab_param = NULL
     k_acc = 0
@@ -4226,31 +4228,21 @@
         for (irun in 1:npar) {
             for (i in 1:(100 * n_cluster)) {
                 l = dim(param_previous_step)[2]
-                if (!inside_prior) {
+                counter = 0
+                repeat {
+                  counter = counter + 1
                   k_acc = k_acc + 1
                   # pick a particle
-                  param_picked = .particle_pick(as.matrix(as.matrix(param_previous_step)), 
-                    tab_weight)
+                  param_picked = .particle_pick(param_previous_step, tab_weight)
                   # move it
-                  param_moved = .move_particle(as.numeric(param_picked), 2 * cov.wt(as.matrix(as.matrix(param_previous_step)), 
-                    as.vector(tab_weight))$cov)  # only variable parameters are moved, computation of a WEIGHTED variance
-                } else {
-                  test = FALSE
-                  counter = 0
-                  while ((!test) && (counter < 100)) {
-                    counter = counter + 1
-                    k_acc = k_acc + 1
-                    # pick a particle
-                    param_picked = .particle_pick(as.matrix(as.matrix(param_previous_step)), 
-                      tab_weight)
-                    # move it
-                    param_moved = .move_particle(as.numeric(param_picked), 2 * cov.wt(as.matrix(as.matrix(param_previous_step)), 
-                      as.vector(tab_weight))$cov)  # only variable parameters are moved, computation of a WEIGHTED variance
-                    test = .is_included(param_moved, prior)
+                  # only variable parameters are moved, computation of a WEIGHTED variance
+                  param_moved = .move_particle(as.numeric(param_picked), 2*cov.wt(as.matrix(as.matrix(param_previous_step)),as.vector(tab_weight))$cov)
+                  if ((!inside_prior) || (.is_included(param_moved, prior)) || (counter >= max_pick)) {
+                    break
                   }
-                  if (counter == 100) {
-                    stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
-                  }
+                }
+                if (counter == max_pick) {
+                  stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
                 }
                 param = param_previous_step[1, ]
                 param = param_moved
@@ -4270,29 +4262,21 @@
         list_param = list(NULL)
         for (i in 1:n_end) {
             l = dim(param_previous_step)[2]
-            if (!inside_prior) {
+            counter = 0
+            repeat {
                 k_acc = k_acc + 1
+                counter = counter + 1
                 # pick a particle
                 param_picked = .particle_pick(param_previous_step, tab_weight)
                 # move it
                 param_moved = .move_particle(as.numeric(param_picked), 2 * cov.wt(as.matrix(as.matrix(param_previous_step)), 
-                  as.vector(tab_weight))$cov)  # only variable parameters are moved, computation of a WEIGHTED variance
-            } else {
-                test = FALSE
-                counter = 0
-                while ((!test) && (counter < 100)) {
-                  k_acc = k_acc + 1
-                  counter = counter + 1
-                  # pick a particle
-                  param_picked = .particle_pick(param_previous_step, tab_weight)
-                  # move it
-                  param_moved = .move_particle(as.numeric(param_picked), 2 * cov.wt(as.matrix(as.matrix(param_previous_step)), 
                     as.vector(tab_weight))$cov)  # only variable parameters are moved, computation of a WEIGHTED variance
-                  test = .is_included(param_moved, prior)
+                if ((!inside_prior) || (.is_included(param_moved, prior)) || (counter >= max_pick)) {
+                    break
                 }
-                if (counter == 100) {
-                  stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
-                }
+            }
+            if (counter == max_pick) {
+                stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
             }
             param = param_previous_step[1, ]
             param = param_moved
@@ -4305,17 +4289,15 @@
         for (i in 1:n_end) {
             tab_simul_summarystat = rbind(tab_simul_summarystat, as.numeric(list_simul_summarystat[[i]]))
         }
-        stopCluster(cl)
-    } else {
-        stopCluster(cl)
     }
+    stopCluster(cl)
     list(cbind(tab_param, tab_simul_summarystat), nb_simul/k_acc)
 }
 
 ## function to perform ABC simulations from a non-uniform prior and with
 ## unidimensional jumps
 .ABC_launcher_not_uniformc_uni_cluster <- function(model, prior, param_previous_step, 
-    tab_weight, nb_simul, seed_count, inside_prior, n_cluster) {
+    tab_weight, nb_simul, seed_count, inside_prior, n_cluster, max_pick=10000) {
     tab_simul_summarystat = NULL
     tab_param = NULL
     k_acc = 0
@@ -4346,7 +4328,7 @@
                 } else {
                   test = FALSE
                   counter = 0
-                  while ((!test) && (counter < 100)) {
+                  while ((!test) && (counter < max_pick)) {
                     k_acc = k_acc + 1
                     counter = counter + 1
                     # pick a particle
@@ -4356,7 +4338,7 @@
                     param_moved = .move_particle_uni(as.numeric(param_picked), sd_array)  # only variable parameters are moved
                     test = .is_included(param_moved, prior)
                   }
-                  if (counter == 100) {
+                  if (counter == max_pick) {
                     stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
                   }
                 }
@@ -4387,7 +4369,7 @@
             } else {
                 test = FALSE
                 counter = 0
-                while ((!test) && (counter < 100)) {
+                while ((!test) && (counter < max_pick)) {
                   counter = counter + 1
                   k_acc = k_acc + 1
                   # pick a particle
@@ -4397,7 +4379,7 @@
                   param_moved = .move_particle_uni(as.numeric(param_picked), sd_array)  # only variable parameters are moved
                   test = .is_included(param_moved, prior)
                 }
-                if (counter == 100) {
+                if (counter == max_pick) {
                   stop("The proposal jumps outside of the prior distribution too often - consider using the option 'inside_prior=FALSE' or enlarging the prior distribution")
                 }
             }
@@ -4422,7 +4404,7 @@
 ## sequential algorithm of Lenormand et al. 2012
 .ABC_Lenormand_cluster <- function(model, prior, prior_test, nb_simul, summary_stat_target, 
     n_cluster, verbose, alpha = 0.5, p_acc_min = 0.05, dist_weights=NULL, seed_count = 0, inside_prior = TRUE, 
-    progress_bar = FALSE) {
+    progress_bar = FALSE, max_pick=10000) {
     ## checking errors in the inputs
     if (!is.vector(alpha)) 
         stop("'alpha' has to be a number.")
@@ -4511,7 +4493,7 @@
         simul_below_tol2 = NULL
         tab_inic = .ABC_launcher_not_uniformc_cluster(model, prior, as.matrix(as.matrix(simul_below_tol)[, 
             1:nparam]), tab_weight/sum(tab_weight), nb_simul_step, seed_count, inside_prior, 
-            n_cluster)
+            n_cluster, max_pick)
         tab_ini = as.matrix(tab_inic[[1]])
         tab_ini = as.numeric(tab_ini)
         dim(tab_ini) = c(nb_simul_step, (nparam + nstat))
@@ -4623,7 +4605,7 @@
 ## tolerance and proposal range following Wegmann et al. 2009
 .ABC_MCMC2_cluster <- function(model, prior, prior_test, n_obs, n_between_sampling, 
     summary_stat_target, n_cluster, verbose, n_calibration = 10000, tolerance_quantile = 0.01, 
-    proposal_phi = 1, dist_weights=NULL, seed_count = 0) {
+    proposal_phi = 1, dist_weights=NULL, seed_count = 0, max_pick=100000) {
     ## checking errors in the inputs
     if (!is.vector(n_calibration)) 
         stop("'n_calibration' has to be a number.")
@@ -4702,7 +4684,7 @@
     for (is in 2:n_obs) {
         for (i in 1:n_between_sampling) {
             param = .move_particle_uni_uniform(as.numeric(param_ini), proposal_range, 
-                prior)
+                prior, max_pick)
             param = c((seed_count + i), param)
             simul_summary_stat = model(param)
             param = param[2:(nparam + 1)]
@@ -4753,7 +4735,7 @@
 ## are not implemented in the algorithm
 .ABC_MCMC3_cluster <- function(model, prior, prior_test, n_obs, n_between_sampling, 
     summary_stat_target, n_cluster, verbose, n_calibration = 10000, tolerance_quantile = 0.01, 
-    proposal_phi = 1, numcomp = 0, dist_weights=NULL, seed_count = 0) {
+    proposal_phi = 1, numcomp = 0, dist_weights=NULL, seed_count = 0, max_pick=100000) {
     ## checking errors in the inputs
     if (!is.vector(n_calibration)) 
         stop("'n_calibration' has to be a number.")
@@ -4914,7 +4896,7 @@
         for (i in 1:n_between_sampling) {
             ## AM6 print('AM6 ')
             param = .move_particle_uni_uniform(as.numeric(param_ini), proposal_range, 
-                prior)
+                prior, max_pick)
             param = c((seed_count + i), param)
             ## AM7 print('AM7 ')
             simul_summary_stat = model(param)

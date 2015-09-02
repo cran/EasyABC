@@ -1,5 +1,11 @@
 == EasyABC changelog ==
 
+=== Version 1.5 ===
+  
+  * new algorithm introduced by Carlo Albert: Simulated Annealing
+  * bugfix in Delmoral implementation distance computation (thanks to Milton Pifano)
+  * bugfixes from Stephen Nawara
+
 === Version 1.4 ===
 
   * optional weighted euclidean distance (suggested by Wim Delva and Maxime Lenormand)

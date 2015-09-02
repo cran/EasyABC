@@ -103,7 +103,12 @@
           \code{50} by default.
           }
     \item{progress_bar}{
-      logical, \code{FALSE} by default. If \code{TRUE}, \code{ABC_sequential} will output a bar of progression with the estimated remaining computing time. Option not available with multiple cores.}
+      logical, \code{FALSE} by default. If \code{TRUE}, \code{ABC_sequential} will output a bar of progression with the estimated remaining computing time. Option not available with multiple cores.
+          }
+    \item{max_pick}{
+          a positive number, the max number of fails when moving particle inside the prior. Enabled only if inside_prior is to \code{TRUE}.
+          \code{10000} by default.
+          }
   }
 }
 \details{

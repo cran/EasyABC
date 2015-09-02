@@ -83,7 +83,12 @@
     \item{seed_count}{
 	  a positive integer, the initial seed value provided to the function \code{model} (if \code{use_seed=TRUE}). This value is incremented by 1 at each call of the function \code{model}.}
     \item{progress_bar}{
-      logical, \code{FALSE} by default. If \code{TRUE}, \code{ABC_mcmc} will output a bar of progression with the estimated remaining computing time. Option not available with multiple cores.}
+      logical, \code{FALSE} by default. If \code{TRUE}, \code{ABC_mcmc} will output a bar of progression with the estimated remaining computing time. Option not available with multiple cores.
+        }
+    \item{max_pick}{
+          a positive number, the max number of fails when moving particle inside the prior. Enabled only if inside_prior is to \code{TRUE}.
+          \code{10000} by default.
+          }
   }
 }
 \details{
