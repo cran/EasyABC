@@ -1,5 +1,12 @@
 == EasyABC changelog ==
 
+
+=== Version 1.5.1 ===
+
+  * Bugfix in SABC implementation
+  * fix email adress of maintainer
+  * bugfix in distance computation considering weights, thanks to Clémentine Straub
+
 === Version 1.5 ===
   
   * new algorithm introduced by Carlo Albert: Simulated Annealing

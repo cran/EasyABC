@@ -106,14 +106,19 @@
             simul <- matrix(simul, 1, length(simul))
         }
     }
+    dist=NULL
     if (!is.null(dist_weights)) {
-        simul = simul * (dist_weights/sum(dist_weights))
+        for (i in 1:l){
+            dist = dist + (simul[,i] - summary_stat_target[i]) * (simul[,i] - summary_stat_target[i]) * (dist_weights[i]/sum(dist_weights))
+        }
+    } else {
+        vartab = sd_simul^2
+        # Ensure positivity of variances: the elements of vartab that are close to zero
+        # are set to one
+        vartab[vartab == 0] = 1
+        dist=colSums((t(simul) - as.vector(summary_stat_target))^2/as.vector(vartab))
     }
-    vartab = sd_simul^2
-    # Ensure positivity of variances: the elements of vartab that are close to zero
-    # are set to one
-    vartab[vartab == 0] = 1
-    colSums((t(simul) - as.vector(summary_stat_target))^2/as.vector(vartab))
+    dist
 }
 
 ## function to select the simulations that are at a distance smaller than tol from
@@ -1039,23 +1044,25 @@
     l = length(summary_stat_target)
     nsimul = dim(simul)[1]
     if (is.null(nsimul)) {
-        nsimul = length(simul)
+     nsimul = length(simul)
     }
+    dist = array(0, nsimul)
     if (!is.null(dist_weights)) {
         # TODO test if len(dist_weights)==len(summary_stat_target)
-        simul = simul * (dist_weights/sum(dist_weights))
-    }
-    vartab = array(1, l)
-    dist = array(0, nsimul)
-    if (l > 1) {
         for (i in 1:l) {
-            vartab[i] = min(1, 1/(sd_simul[i] * sd_simul[i]))  ## differences between simul and data are normalized in each dimension by the empirical variances in each dimension
-            dist = dist + vartab[i] * (simul[, i] - summary_stat_target[i]) * (simul[, 
-                i] - summary_stat_target[i])  ## an euclidean distance is used
+            dist = dist + (simul[,i] - summary_stat_target[i]) * (simul[,i] - summary_stat_target[i]) * (dist_weights[i]/sum(dist_weights))
         }
     } else {
-        vartab = min(1, 1/(sd_simul * sd_simul))  ## differences between simul and data are normalized in each dimension by the empirical variances in each dimension
-        dist = dist + vartab * (simul[, 1] - summary_stat_target) * (simul[, 1] - summary_stat_target)  ## an euclidean distance is used
+        vartab = array(1, l)
+        if (l > 1) {
+            for (i in 1:l) {
+                vartab[i] = min(1, 1/(sd_simul[i] * sd_simul[i]))  ## differences between simul and data are normalized in each dimension by the empirical variances in each dimension
+                dist = dist + vartab[i] * (simul[, i] - summary_stat_target[i]) * (simul[,i] - summary_stat_target[i])  ## an euclidean distance is used
+            }
+        } else {
+            vartab = min(1, 1/(sd_simul * sd_simul))  ## differences between simul and data are normalized in each dimension by the empirical variances in each dimension
+            dist = dist + vartab * (simul[, 1] - summary_stat_target) * (simul[, 1] - summary_stat_target)  ## an euclidean distance is used
+        }
     }
     distb = matrix(0, nsimul/M, M)
     for (i in 1:(nsimul/M)) {
@@ -4463,11 +4470,8 @@
         tab_ini[, 1:nparam], tab_ini[, (nparam + 1):(nparam + nstat)], sd_simul, 
         alpha, dist_weights=dist_weights))
     simul_below_tol = simul_below_tol[1:n_alpha, ]  # to be sure that there are not two or more simulations at a distance equal to the tolerance determined by the quantile
-    tab_dist = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
+    tab_dist = .compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[,
         (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
-    if (!is.null(dist_weights)) {
-        tab_dist = tab_dist * (dist_weights/sum(dist_weights))
-    }
     tol_next = max(tab_dist)
     intermediary_steps = list(NULL)
     if (verbose == TRUE) {
@@ -4515,9 +4519,6 @@
         tab_weight = c(tab_weight, tab_weight2)
         tab_dist2 = .compute_dist(summary_stat_target, as.matrix(as.matrix(tab_ini)[, 
             (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)
-        if (!is.null(dist_weights)) {
-            tab_dist2 = tab_dist2 * (dist_weights/sum(dist_weights))
-        }
         p_acc = length(tab_dist2[!is.na(tab_dist2) & tab_dist2 <= tol_next])/nb_simul_step
         tab_dist = c(tab_dist, tab_dist2)
         tol_next = sort(tab_dist)[n_alpha]
@@ -4560,7 +4561,7 @@
             stats = as.matrix(as.matrix(simul_below_tol)[, (nparam + 1):(nparam + 
                 nstat)]), weights = tab_weight/sum(tab_weight), stats_normalization = as.numeric(sd_simul), 
             epsilon = max(.compute_dist(summary_stat_target, as.matrix(as.matrix(simul_below_tol)[, 
-                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count - 
+                (nparam + 1):(nparam + nstat)]), sd_simul, dist_weights=dist_weights)), nsim = (seed_count -
                 seed_count_ini), computime = as.numeric(difftime(Sys.time(), start, 
                 units = "secs")), intermediary = intermediary_steps)
     } else {

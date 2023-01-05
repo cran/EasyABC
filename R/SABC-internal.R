@@ -327,13 +327,19 @@ SABC.inf <- function(f.dist, d.prior, r.prior, n.sample, eps.init, iter.max,
 
   # Catch an error and jump to noninformative case
   Cov.uv <- cov(E[,(dim.par+1):(dim.par+2)])
-  if (class(try(solve(Cov.uv),TRUE)) == "try-error"){
+  tryCatch(               
+    expr = {                     
+      solve(Cov.uv)
+    },
+    # Specifying error message
+    error = function(e){     
       warning("Flat prior; method 'uninformative' was used instead!")
       res <- SABC.noninf(f.dist, d.prior, r.prior, n.sample, eps.init,
                          iter.max, v, beta, delta, resample, verbose,
                          adaptjump, summarystats, y, f.summarystats, ...)
       return(res)
-  }
+    }
+  )
 
   ##--------------
   ## 2. iteration
